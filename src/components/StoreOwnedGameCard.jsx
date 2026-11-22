@@ -270,13 +270,13 @@ export default function StoreOwnedGameCard({
         onClick={showDetails}
         onKeyDown={onKeyDown}
         onContextMenu={handleContextMenu}
-        className="group relative flex cursor-pointer items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200 hover:border-primary/30 hover:bg-accent/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="group relative flex cursor-pointer items-center gap-4 rounded-2xl border border-border/40 bg-card/80 p-2.5 pr-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         {contextMenuPortal}
         {fixDialog}
         {selectionCheckbox}
 
-        <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
+        <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm md:w-64">
           {banner ? (
             <img
               src={banner}
@@ -389,7 +389,7 @@ export default function StoreOwnedGameCard({
       onContextMenu={handleContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="press group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="press group relative cursor-pointer overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       {contextMenuPortal}
       {fixDialog}
@@ -414,7 +414,7 @@ export default function StoreOwnedGameCard({
           {/* Hover overlay with title + favorite, same as installed games */}
           <div
             className={cn(
-              "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
+              "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-3 transition-opacity duration-300",
               selectionMode && "hidden",
               isHovered && !selectionMode ? "opacity-100" : "pointer-events-none opacity-0"
             )}

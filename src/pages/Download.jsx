@@ -547,23 +547,10 @@ function PublicDownloadPage() {
   }, [gameData?.game]);
 
   // Ascend perks and mod browsing follow the same access as the library's
-  // Extras tab, which also covers the free trial
+  // Local Ascend-gated features (Nexus Mods browser, unlimited queue, concurrent downloads) are unlocked locally
   useEffect(() => {
-    if (!isAuthenticated) {
-      setHasAscendAccess(false);
-      return;
-    }
-    let cancelled = false;
-    verifyAscendAccess()
-      .then(result => !cancelled && setHasAscendAccess(!!result?.hasAccess))
-      .catch(error => {
-        console.error("Error verifying Ascend access:", error);
-        if (!cancelled) setHasAscendAccess(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
+    setHasAscendAccess(true);
+  }, []);
 
   useEffect(() => {
     setShowModsBrowser(false);
@@ -1091,20 +1078,7 @@ function PublicDownloadPage() {
         dir: dir,
       };
 
-      // Non-Ascend users can queue 1 download max
-      if (!isAuthenticated) {
-        const currentQueue = getDownloadQueue();
-        if (currentQueue.length >= 1) {
-          toast.error(t("download.toast.downloadQueueLimit"));
-          return;
-        }
-        // Allow queuing 1 download
-        setPendingDownloadData(downloadData);
-        setShowQueuePrompt(true);
-        return;
-      }
-
-      // Ascend users get the queue dialog with unlimited queue
+      // Unlimited download queue is unlocked locally
       setPendingDownloadData(downloadData);
       setShowQueuePrompt(true);
       return;
@@ -1152,11 +1126,6 @@ function PublicDownloadPage() {
         gameData,
         dir,
       });
-
-      if (!isAuthenticated && getDownloadQueue().length >= 1) {
-        toast.error(t("download.toast.downloadQueueLimit"));
-        return true;
-      }
 
       setPendingDownloadData(downloadData);
       setShowQueuePrompt(true);
@@ -2168,8 +2137,8 @@ function PublicDownloadPage() {
             />
             <AscendPerks
               gameName={gameData.game}
-              isAuthenticated={isAuthenticated}
-              hasAccess={!!userData?.ascendSubscription?.active || hasAscendAccess}
+              isAuthenticated={true}
+              hasAccess={true}
               supportsModManaging={supportsModManaging}
               supportsFlingTrainer={supportsFlingTrainer}
               supportsAutoUpdates={
@@ -2178,7 +2147,7 @@ function PublicDownloadPage() {
               }
               onGetAscend={() => navigate("/ascend")}
               onBrowseMods={
-                hasAscendAccess && nexusGameData?.domainName
+                nexusGameData?.domainName
                   ? () => setShowModsBrowser(true)
                   : undefined
               }
@@ -2330,7 +2299,7 @@ function PublicDownloadPage() {
       <QueueDialog
         open={showQueuePrompt}
         onOpenChange={setShowQueuePrompt}
-        isAuthenticated={isAuthenticated}
+        isAuthenticated={true}
         onCancel={() => {
           setShowQueuePrompt(false);
           setPendingDownloadData(null);

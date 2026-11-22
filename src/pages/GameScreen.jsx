@@ -1501,7 +1501,7 @@ function InstalledGameScreen() {
   const [nexusGameData, setNexusGameData] = useState(null);
   const nexusMods = useNexusMods(
     nexusGameData,
-    supportsModManaging && isAuthenticated && ascendAccess.hasAccess,
+    supportsModManaging,
     { gameName: game?.game || game?.name, isCustom: game?.isCustom || false }
   );
 
@@ -1597,13 +1597,6 @@ function InstalledGameScreen() {
   };
 
   const handleStartUpdate = async () => {
-    // Check if user has Ascend access - if not, promote Ascend
-    if (!isAuthenticated || !ascendAccess.hasAccess) {
-      setShowUpdateDialog(false);
-      navigate("/ascend");
-      return;
-    }
-
     // No seamless or Magic Link source: let the download page handle it
     if ((!updateInfo?.autoUpdateSupported && !updateViaMagicLink) || !updateSource) {
       openUpdateOnDownloadPage();
@@ -3726,11 +3719,7 @@ function InstalledGameScreen() {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-4 text-muted-foreground">
-                <p>
-                  {isAuthenticated && ascendAccess.hasAccess
-                    ? t("gameScreen.updateAvailableDescription")
-                    : t("gameScreen.updateAvailableDescriptionNoAuth")}
-                </p>
+                <p>{t("gameScreen.updateAvailableDescription")}</p>
                 <div className="rounded-lg border bg-muted/50 p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm">{t("gameScreen.currentVersion")}</span>
@@ -3745,66 +3734,45 @@ function InstalledGameScreen() {
                     </span>
                   </div>
                 </div>
-                {isAuthenticated && ascendAccess.hasAccess && updateViaMagicLink && (
+                {updateViaMagicLink && (
                   <div className="flex items-start gap-2.5 rounded-lg bg-primary/5 px-3 py-2.5 text-xs leading-relaxed text-primary">
                     <WandSparkles className="mt-px h-4 w-4 shrink-0" />
                     <span>{t("gameScreen.updateViaMagicLink")}</span>
                   </div>
                 )}
-                {(!isAuthenticated || !ascendAccess.hasAccess) && (
-                  <p className="text-xs text-muted-foreground/80">
-                    {t("gameScreen.updateManualHint")}
-                  </p>
-                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {isAuthenticated && ascendAccess.hasAccess ? (
-            <div className="space-y-2">
-              <DownloadButton
-                stage={updateLinkStage || (isStartingUpdate ? "busy" : "idle")}
-                label={
-                  isStartingUpdate
-                    ? t("gameScreen.startingUpdate")
-                    : t("gameScreen.downloadUpdate")
-                }
-                stepLabels={{
-                  opening: t("download.downloadOptions.openingDownloadPage"),
-                  countdown: t("download.downloadOptions.waitingForCountdown"),
-                  resolving: t("download.downloadOptions.gettingDownloadLink"),
-                  starting: t("download.downloadOptions.startingDownload"),
-                }}
-                icon={ArrowUpFromLine}
-                onClick={handleStartUpdate}
-                disabled={isStartingUpdate || !!updateLinkStage}
-                countdown={updateCountdown}
-                showSteps={updateViaMagicLink}
-                hasCountdownStep={updateSource?.provider === "megadb"}
-              />
-              <Button
-                variant="ghost"
-                className="w-full text-muted-foreground"
-                disabled={!!updateLinkStage}
-                onClick={() => setShowUpdateDialog(false)}
-              >
-                {t("common.later")}
-              </Button>
-            </div>
-          ) : (
-            <AlertDialogFooter className="flex gap-2">
-              <Button
-                variant="outline"
-                className="text-primary"
-                onClick={() => setShowUpdateDialog(false)}
-              >
-                {t("common.later")}
-              </Button>
-              <Button className="text-secondary" onClick={handleStartUpdate}>
-                <Download className="mr-2 h-4 w-4" />
-                {t("gameScreen.getAscendToUpdate")}
-              </Button>
-            </AlertDialogFooter>
-          )}
+          <div className="space-y-2">
+            <DownloadButton
+              stage={updateLinkStage || (isStartingUpdate ? "busy" : "idle")}
+              label={
+                isStartingUpdate
+                  ? t("gameScreen.startingUpdate")
+                  : t("gameScreen.downloadUpdate")
+              }
+              stepLabels={{
+                opening: t("download.downloadOptions.openingDownloadPage"),
+                countdown: t("download.downloadOptions.waitingForCountdown"),
+                resolving: t("download.downloadOptions.gettingDownloadLink"),
+                starting: t("download.downloadOptions.startingDownload"),
+              }}
+              icon={ArrowUpFromLine}
+              onClick={handleStartUpdate}
+              disabled={isStartingUpdate || !!updateLinkStage}
+              countdown={updateCountdown}
+              showSteps={updateViaMagicLink}
+              hasCountdownStep={updateSource?.provider === "megadb"}
+            />
+            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              disabled={!!updateLinkStage}
+              onClick={() => setShowUpdateDialog(false)}
+            >
+              {t("common.later")}
+            </Button>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
 

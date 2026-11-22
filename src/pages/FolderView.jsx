@@ -16,6 +16,7 @@ import {
   Pencil,
   Folder,
   Import,
+  Search,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -78,8 +79,8 @@ const GameCard = React.memo(
     return (
       <Card
         className={cn(
-          "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-          "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+          "group relative overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300",
+          "press hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10",
           "cursor-pointer"
         )}
         onClick={e => {
@@ -103,25 +104,25 @@ const GameCard = React.memo(
               </div>
             )}
             {hasUpdate && (
-              <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary">
+              <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary shadow-sm">
                 <Import className="h-3 w-3" />
                 {t("gameScreen.updateBadge")}
               </span>
             )}
             <div
               className={cn(
-                "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
+                "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-3 transition-opacity duration-300",
                 isHovered ? "opacity-100" : "opacity-0"
               )}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  {game.online && <Gamepad2 className="h-3.5 w-3.5 text-white/70" />}
-                  {game.dlc && <Gift className="h-3.5 w-3.5 text-white/70" />}
+                  {game.online && <Gamepad2 className="h-3.5 w-3.5 text-white/80" />}
+                  {game.dlc && <Gift className="h-3.5 w-3.5 text-white/80" />}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    className="rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
+                    className="rounded-full border border-white/15 bg-black/50 p-1.5 text-white backdrop-blur-md transition-colors hover:bg-black/75"
                     title={t("library.removeFromFolder")}
                     onClick={e => {
                       e.stopPropagation();
@@ -131,7 +132,7 @@ const GameCard = React.memo(
                     <FolderUp className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    className="rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
+                    className="rounded-full border border-white/15 bg-black/50 p-1.5 text-white backdrop-blur-md transition-colors hover:bg-black/75"
                     title={
                       isFavorite ? t("library.removeFavorite") : t("library.addFavorite")
                     }
@@ -207,23 +208,9 @@ const FolderView = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [renameError, setRenameError] = useState("");
-  const { user } = useAuth();
-  const [hasAscendAccess, setHasAscendAccess] = useState(false);
+  const [hasAscendAccess] = useState(true);
   const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) {
-      setHasAscendAccess(false);
-      return;
-    }
-    verifyAscendAccess()
-      .then(result => !cancelled && setHasAscendAccess(!!result?.hasAccess))
-      .catch(() => !cancelled && setHasAscendAccess(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+  const [folderSearch, setFolderSearch] = useState("");
 
   // Same check the library runs; answers are shared through gameService's cache
   const updateCheckKey = folderGames
@@ -611,54 +598,58 @@ const FolderView = () => {
       style={{ top: MENU_BAR_HEIGHT_PX }}
     >
       {/* ── Sidebar ── */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border/60">
-        <button
-          className="flex items-center gap-3 border-b border-border/60 px-4 pb-3 pt-3 transition-colors hover:bg-accent/50"
-          onClick={() => navigate("/library")}
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 ring-1 ring-primary/30">
-            <ChevronLeft className="h-4 w-4 text-primary" />
-          </span>
-          <div className="min-w-0 flex-1 text-left">
-            <p className="truncate text-sm font-semibold leading-none text-foreground">
-              {t("common.back")}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("library.backToLibrary")}
-            </p>
-          </div>
-        </button>
+      <aside className="flex w-60 shrink-0 flex-col border-r border-border/40 bg-card/35 backdrop-blur-md">
+        <div className="mx-3 mt-3">
+          <button
+            className="flex w-full items-center gap-3 rounded-2xl border border-border/40 bg-card/70 px-3 py-2.5 shadow-sm transition-all hover:border-primary/40 hover:bg-card"
+            onClick={() => navigate("/library")}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/25">
+              <ChevronLeft className="h-4 w-4 text-primary" />
+            </span>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-sm font-semibold leading-none text-foreground">
+                {t("common.back")}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {t("library.backToLibrary")}
+              </p>
+            </div>
+          </button>
+        </div>
 
-        <div className="px-4 pt-4">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+        <div className="mx-3 mt-3 rounded-2xl border border-border/40 bg-gradient-to-br from-primary/10 via-card/80 to-card/40 p-3.5 shadow-sm">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
             Folder
           </p>
           <div className="flex items-center gap-2">
-            <Folder className="h-4 w-4 shrink-0 text-primary" />
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Folder className="h-4 w-4" />
+            </span>
             <p className="flex-1 truncate text-sm font-semibold text-foreground">
               {decodedName}
             </p>
             <button
-              className="shrink-0 rounded p-1 hover:bg-accent"
+              className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               onClick={() => {
                 setNewFolderName(decodedName);
                 setRenameError("");
                 setShowRenameDialog(true);
               }}
             >
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              <Pencil className="h-3.5 w-3.5" />
             </button>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-2 text-xs text-muted-foreground">
             {folderGames.length} {t("library.gamesInFolder")}
           </p>
         </div>
 
         <div className="flex-1" />
 
-        <div className="px-4 pb-4">
+        <div className="px-3 pb-4">
           <button
-            className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+            className="text-destructive/80 hover:bg-destructive/10 hover:text-destructive flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
             onClick={() => setShowDeleteDialog(true)}
           >
             <Folder className="h-4 w-4" />
@@ -780,20 +771,67 @@ const FolderView = () => {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Sticky frosted folder header */}
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border/40 bg-background/80 px-6 py-3.5 backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Folder className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-bold leading-tight text-foreground">
+                {decodedName}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {folderGames.length} {t("library.gamesInFolder")}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative w-full max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              value={folderSearch}
+              onChange={e => setFolderSearch(e.target.value)}
+              placeholder={t("library.searchLibrary")}
+              className="h-9 rounded-xl border-border/50 bg-card/70 pl-9 text-sm shadow-sm transition-colors focus-visible:border-primary/50 focus-visible:bg-card"
+            />
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {(() => {
-            const gamesToShow =
+            const allFolderGames =
               folderGames.length > 0 ? folderGames : lastFolderGamesRef.current;
+            const query = folderSearch.trim().toLowerCase();
+            const gamesToShow = query
+              ? allFolderGames.filter(g =>
+                  (g.game || g.name || "").toLowerCase().includes(query)
+                )
+              : allFolderGames;
 
-            if (gamesToShow.length === 0 && !isLoading) {
+            if (allFolderGames.length === 0 && !isLoading) {
               return (
                 <div className="mt-16 flex flex-col items-center justify-center text-center">
-                  <Folder className="mb-4 h-16 w-16 text-primary" />
-                  <h2 className="mb-2 text-2xl font-bold">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Folder className="h-8 w-8" />
+                  </div>
+                  <h2 className="mb-2 text-2xl font-bold text-foreground">
                     {t("library.emptyFolderTitle")}
                   </h2>
-                  <p className="mb-4 text-muted-foreground">
+                  <p className="mb-4 max-w-sm text-sm text-muted-foreground">
                     {t("library.emptyFolderDescription")}
+                  </p>
+                </div>
+              );
+            }
+
+            if (gamesToShow.length === 0) {
+              return (
+                <div className="mt-16 flex flex-col items-center justify-center text-center">
+                  <Search className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">
+                    {t("library.noSearchResults") || "No matching games in this folder"}
                   </p>
                 </div>
               );

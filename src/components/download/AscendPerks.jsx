@@ -31,7 +31,7 @@ export default function AscendPerks({
   const { t } = useLanguage();
   const [openPerk, setOpenPerk] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const locked = !isAuthenticated || !hasAccess;
+  const locked = false;
   const name = gameName || t("download.perkDialog.thisGame");
   const perks = [
     { id: "cloudSaves", icon: Cloud, label: t("download.cloudSaving") },

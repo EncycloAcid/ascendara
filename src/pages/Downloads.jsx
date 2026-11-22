@@ -1095,17 +1095,7 @@ const Downloads = () => {
     );
     const hasResuming = resumingDownloads.size > 0 && !resumingDownloads.has(game.game);
 
-    // If there's an active download or another resuming download and user doesn't have Ascend, show warning
-    if ((hasActive || hasResuming) && !isAuthenticated) {
-      toast(t("downloads.ascendRequired.title"), {
-        description: t("downloads.ascendRequired.description"),
-        action: {
-          label: t("downloads.ascendRequired.learnMore"),
-          onClick: () => navigate("/ascend"),
-        },
-      });
-      return;
-    }
+    // Concurrent and queued downloads are unlocked locally
 
     // Proceed with resume
     await executeResumeDownload(game);

@@ -111,14 +111,14 @@ const FolderCard = ({
         <div
           data-library-folder={name}
           className={cn(
-            "group relative flex cursor-pointer items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200",
-            "hover:border-primary/30 hover:bg-accent/30 hover:shadow-md",
+            "group relative flex cursor-pointer items-center gap-4 rounded-2xl border border-border/40 bg-card/80 p-2.5 pr-4 shadow-sm backdrop-blur-sm transition-all duration-300",
+            "hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/5",
             className
           )}
           onClick={handleFolderClick}
         >
           {/* Cover strip, same footprint as the game row banner so titles line up */}
-          <div className="relative grid h-[72px] w-56 shrink-0 grid-cols-4 gap-px overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
+          <div className="relative grid h-[72px] w-56 shrink-0 grid-cols-4 gap-px overflow-hidden rounded-xl bg-zinc-900 shadow-sm md:w-64">
             {slots.map((slot, index) =>
               slot?.image ? (
                 <img
@@ -136,7 +136,7 @@ const FolderCard = ({
                 </div>
               )
             )}
-            <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
               <Folder className="h-3 w-3" />
               {folderGames.length}
             </span>
@@ -163,7 +163,7 @@ const FolderCard = ({
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
-              className="hover:bg-destructive/10 rounded-md p-2 text-muted-foreground opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
+              className="hover:bg-destructive/10 rounded-lg p-2 text-muted-foreground opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
               title={t("library.removeFolder")}
               onClick={e => {
                 e.stopPropagation();
@@ -179,8 +179,8 @@ const FolderCard = ({
         <Card
           data-library-folder={name}
           className={cn(
-            "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-            "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+            "group relative overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300",
+            "press hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10",
             "cursor-pointer",
             className
           )}
@@ -213,13 +213,13 @@ const FolderCard = ({
               </div>
 
               {/* Hover overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
               {/* Delete button — top-right on hover */}
               <button
                 type="button"
                 className={cn(
-                  "hover:bg-destructive/80 absolute right-2 top-2 z-20 rounded-full bg-black/50 p-1.5 text-white transition-opacity",
+                  "hover:bg-destructive/80 absolute right-2 top-2 z-20 rounded-full border border-white/15 bg-black/55 p-1.5 text-white backdrop-blur-md transition-opacity",
                   isHovered ? "opacity-100" : "pointer-events-none opacity-0"
                 )}
                 title={t("library.removeFolder")}
@@ -232,7 +232,7 @@ const FolderCard = ({
               </button>
 
               {/* Game count badge — top-left */}
-              <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
                 {isHovered ? (
                   <FolderOpen className="h-3 w-3" />
                 ) : (

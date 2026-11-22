@@ -2,6 +2,7 @@ import { useLibraryConflicts } from "@/hooks/useLibraryConflicts";
 import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { libraryInstallKey, reconcileFolderItems } from "@/lib/libraryConflicts";
 import LibraryConflictDialog from "@/components/LibraryConflictDialog";
+import LibraryHeroBanner from "@/components/LibraryHeroBanner";
 import {
   normalizeGameName,
   getGameDisplayName,
@@ -339,11 +340,25 @@ const Library = () => {
   useEffect(() => {
     safeSetItem("library-viewMode", viewMode);
   }, [viewMode]);
+  const [cardSize, setCardSize] = useState(() => {
+    const saved = localStorage.getItem("library-card-size");
+    return ["compact", "standard", "large"].includes(saved) ? saved : "standard";
+  });
+  useEffect(() => {
+    safeSetItem("library-card-size", cardSize);
+  }, [cardSize]);
+  const [heroCollapsed, setHeroCollapsed] = useState(
+    () => localStorage.getItem("library-hero-collapsed") === "true"
+  );
+  useEffect(() => {
+    safeSetItem("library-hero-collapsed", String(heroCollapsed));
+  }, [heroCollapsed]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [filters, setFilters] = useState({
     favorites: false,
     vrOnly: false,
     onlineGames: false,
+    updatesOnly: false,
     // Remembered so connected store libraries stay out of the way between launches
     installedOnly: localStorage.getItem("library-installedOnly") === "true",
   });
@@ -708,12 +723,18 @@ const Library = () => {
       const matchesVr = !filters.vrOnly || game.isVr;
       const matchesOnline = !filters.onlineGames || game.online;
       const matchesInstalled = !filters.installedOnly || !game._isStoreOwned;
+      const matchesUpdates =
+        !filters.updatesOnly ||
+        (game.isFolder
+          ? (game.items || []).some(item => item.gameID && Boolean(gameUpdates[item.gameID]))
+          : Boolean(game.gameID && gameUpdates[game.gameID]));
       return (
         matchesSearch &&
         matchesFavorites &&
         matchesVr &&
         matchesOnline &&
-        matchesInstalled
+        matchesInstalled &&
+        matchesUpdates
       );
     })
     .sort((a, b) => {
@@ -1003,13 +1024,9 @@ const Library = () => {
     [games]
   );
 
-  // Check for game updates when games are loaded (only for Ascend subscribers)
+  // Check for game updates when games are loaded
   useEffect(() => {
     if (!isInitialized) return;
-    if (!user || !ascendAccess.hasAccess) {
-      setGameUpdates({});
-      return;
-    }
     if (!updateCheckKey) {
       setGameUpdates({});
       return;
@@ -1668,9 +1685,35 @@ const Library = () => {
       ? filteredGames.filter(g => !g.isFolder && favorites.includes(g.game || g.name))
       : filteredGames;
 
-  const hasAscend = Boolean(
-    ascendAccess.hasAccess || ascendAccess.isSubscribed || ascendAccess.isVerified
-  );
+  const updatesCount = Object.keys(gameUpdates).length;
+
+  const featuredHeroGame = (() => {
+    const candidates = games.filter(
+      g => !g.isFolder && !g._isDownloading && !g._isQueued && !g._isStoreOwned
+    );
+    if (candidates.length === 0) return null;
+    const sorted = candidates.slice().sort((a, b) => {
+      const aLast = a.lastPlayed || 0;
+      const bLast = b.lastPlayed || 0;
+      if (aLast !== bLast) return bLast - aLast;
+      const aTime = a.playTime || 0;
+      const bTime = b.playTime || 0;
+      if (aTime !== bTime) return bTime - aTime;
+      const aInst = a.installedAt || a.addedAt || 0;
+      const bInst = b.installedAt || b.addedAt || 0;
+      return bInst - aInst;
+    });
+    return sorted[0] || null;
+  })();
+
+  const libraryGridClass =
+    cardSize === "compact"
+      ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8"
+      : cardSize === "large"
+        ? "grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+        : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+
+  const hasAscend = true;
   const steamAccount = storeLibrary.accounts.find(
     account => account.store === "steam" && account.connected
   );
@@ -1810,12 +1853,12 @@ const Library = () => {
         />
       )}
       {/* ── Left Sidebar ─────────────────────────────────────────── */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border/30 shadow-[1px_0_0_0_hsl(var(--border)/0.15)]">
+      <aside className="flex w-60 shrink-0 flex-col border-r border-border/40 bg-card/35 backdrop-blur-md">
         {/* ── User profile strip ── */}
-        <div className="mx-3 mt-3 overflow-hidden rounded-xl border border-border/40 bg-gradient-to-br from-primary/10 via-muted/30 to-muted/10">
+        <div className="mx-3 mt-3 overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-primary/10 via-card/80 to-card/40 shadow-sm">
           <div className="flex items-center gap-1 p-1.5">
             <button
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-foreground/5"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1.5 text-left transition-colors hover:bg-foreground/5"
               onClick={() => navigate("/profile")}
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 ring-2 ring-primary/25">
@@ -2119,7 +2162,7 @@ const Library = () => {
                     }
                   }}
                   className={cn(
-                    "relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                    "relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors",
                     activeTab === tab.id
                       ? "font-semibold text-primary"
                       : "font-medium text-muted-foreground hover:bg-accent/60 hover:text-foreground"
@@ -2128,13 +2171,13 @@ const Library = () => {
                   {activeTab === tab.id && (
                     <motion.span
                       layoutId="library-tab-active"
-                      className="absolute inset-0 rounded-lg bg-primary/10"
+                      className="absolute inset-0 rounded-xl bg-primary/10 shadow-sm ring-1 ring-primary/15"
                       transition={{ type: "spring", stiffness: 400, damping: 34 }}
                     />
                   )}
                   <span
                     className={cn(
-                      "relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                      "relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg",
                       activeTab === tab.id
                         ? "bg-primary/15 text-primary"
                         : "text-muted-foreground"
@@ -2146,7 +2189,7 @@ const Library = () => {
                   {tab.count > 0 && (
                     <span
                       className={cn(
-                        "relative min-w-[1.25rem] rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums transition-transform duration-150 group-hover/drag:translate-x-[-14px]",
+                        "relative min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums transition-transform duration-150 group-hover/drag:translate-x-[-14px]",
                         activeTab === tab.id
                           ? "bg-primary/20 text-primary"
                           : "bg-muted/80 text-muted-foreground"
@@ -2168,8 +2211,8 @@ const Library = () => {
         <div data-tour="library-tools" className="px-2 pb-1">
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary data-[state=open]:bg-accent/60 data-[state=open]:text-foreground">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md">
+              <button className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary data-[state=open]:bg-accent/60 data-[state=open]:text-foreground">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg">
                   <Wrench className="h-4 w-4" />
                 </span>
                 <span className="flex-1 text-left">{t("library.toolsMenu")}</span>
@@ -2323,7 +2366,7 @@ const Library = () => {
 
         {/* ── Storage info ── */}
         <div data-tour="library-storage" className="px-4 pb-4 pt-2">
-          <div className="space-y-2 rounded-lg bg-muted/30 p-3">
+          <div className="space-y-2 rounded-2xl border border-border/40 bg-card/60 p-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <HardDrive className="h-3 w-3" />
@@ -2442,10 +2485,10 @@ const Library = () => {
       {/* ── Main Content ─────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Sticky toolbar */}
-        <div className="flex shrink-0 flex-col gap-2 bg-background/95 px-6 py-3 shadow-[0_1px_0_0_hsl(var(--border)/0.4)] backdrop-blur-sm">
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border/40 bg-background/80 px-6 py-3.5 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             <div data-tour="library-search" className="relative min-w-0 flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <SearchIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder={t("library.searchLibrary")}
@@ -2469,7 +2512,7 @@ const Library = () => {
                     }
                   }
                 }}
-                className="h-9 pl-9"
+                className="h-10 rounded-xl border-border/50 bg-card/70 pl-10 shadow-sm transition-colors focus-visible:border-primary/50 focus-visible:bg-card"
               />
             </div>
 
@@ -2477,35 +2520,72 @@ const Library = () => {
               {(activeTab === "all" ||
                 activeTab === "favorites" ||
                 activeTab === "hiddenFolders") && (
-                <div
-                  data-tour="library-view"
-                  className="flex h-9 items-center rounded-lg border border-border/60 bg-card p-0.5"
-                >
-                  {[
-                    { mode: "grid", icon: LayoutGrid, label: t("library.view.grid") },
-                    { mode: "list", icon: ListIcon, label: t("library.view.list") },
-                  ].map(({ mode, icon: Icon, label }) => (
-                    <Tooltip key={mode}>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={label}
-                          aria-pressed={viewMode === mode}
-                          onClick={() => setViewMode(mode)}
-                          className={cn(
-                            "flex h-full items-center justify-center rounded-md px-2.5 transition-all",
-                            viewMode === mode
-                              ? "bg-primary/10 text-primary shadow-sm"
-                              : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                          )}
-                        >
-                          <Icon className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent className="text-secondary">{label}</TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
+                <>
+                  <div
+                    data-tour="library-view"
+                    className="flex h-10 items-center rounded-xl border border-border/40 bg-muted/40 p-1"
+                  >
+                    {[
+                      { mode: "grid", icon: LayoutGrid, label: t("library.view.grid") },
+                      { mode: "list", icon: ListIcon, label: t("library.view.list") },
+                    ].map(({ mode, icon: Icon, label }) => (
+                      <Tooltip key={mode}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={label}
+                            aria-pressed={viewMode === mode}
+                            onClick={() => setViewMode(mode)}
+                            className={cn(
+                              "flex h-full items-center justify-center rounded-lg px-2.5 transition-all",
+                              viewMode === mode
+                                ? "bg-background text-primary shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-secondary">{label}</TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+
+                  {viewMode === "grid" && (
+                    <div
+                      aria-label="Card density"
+                      className="hidden h-10 items-center rounded-xl border border-border/40 bg-muted/40 p-1 sm:flex"
+                    >
+                      {[
+                        { size: "compact", short: "S", label: "Compact cards" },
+                        { size: "standard", short: "M", label: "Standard cards" },
+                        { size: "large", short: "L", label: "Large cards" },
+                      ].map(({ size, short, label }) => (
+                        <Tooltip key={size}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={label}
+                              aria-pressed={cardSize === size}
+                              onClick={() => setCardSize(size)}
+                              className={cn(
+                                "flex h-full min-w-[1.75rem] items-center justify-center rounded-lg px-2 text-xs font-semibold transition-all",
+                                cardSize === size
+                                  ? "bg-background text-primary shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {short}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="text-secondary">
+                            {label}
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
               <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
@@ -2526,10 +2606,10 @@ const Library = () => {
                         type="button"
                         data-tour="library-filters"
                         className={cn(
-                          "flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-all",
+                          "flex h-10 items-center gap-2 rounded-xl border px-3.5 text-sm font-medium shadow-sm transition-all",
                           hasActiveFilters
                             ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15"
-                            : "border-border/60 bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+                            : "border-border/50 bg-card/70 text-muted-foreground hover:border-primary/40 hover:bg-card hover:text-foreground"
                         )}
                       >
                         <SlidersHorizontal className="h-4 w-4 shrink-0" />
@@ -2800,10 +2880,10 @@ const Library = () => {
                   <TooltipTrigger asChild>
                     <button
                       className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-all",
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all",
                         selectionMode
                           ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15"
-                          : "border-border/60 bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+                          : "border-border/50 bg-card/70 text-muted-foreground hover:border-primary/40 hover:bg-card hover:text-foreground"
                       )}
                       type="button"
                       aria-label={t("library.multiselect")}
@@ -2825,8 +2905,162 @@ const Library = () => {
             </TooltipProvider>
           </div>
 
+          {/* Quick-filter pills bar */}
+          {activeTab === "all" && !selectionMode && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {(() => {
+                const anyQuickFilter =
+                  filters.favorites ||
+                  filters.updatesOnly ||
+                  filters.installedOnly ||
+                  filters.onlineGames ||
+                  filters.vrOnly;
+                const pillBase =
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all";
+                const pillActive =
+                  "border-primary/40 bg-primary/12 text-primary shadow-sm";
+                const pillIdle =
+                  "border-border/40 bg-card/60 text-muted-foreground hover:border-primary/30 hover:bg-card hover:text-foreground";
+
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          favorites: false,
+                          updatesOnly: false,
+                          installedOnly: false,
+                          onlineGames: false,
+                          vrOnly: false,
+                        }))
+                      }
+                      className={cn(pillBase, !anyQuickFilter ? pillActive : pillIdle)}
+                    >
+                      {t("common.all") || "All"}
+                    </button>
+
+                    {updatesCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFilters(prev => ({
+                            ...prev,
+                            updatesOnly: !prev.updatesOnly,
+                          }))
+                        }
+                        className={cn(
+                          pillBase,
+                          filters.updatesOnly ? pillActive : pillIdle
+                        )}
+                      >
+                        <Import className="h-3 w-3" />
+                        <span>{t("gameScreen.updateBadge") || "Updates"}</span>
+                        <span className="rounded-full bg-primary px-1.5 py-0.2 text-[10px] font-bold text-secondary">
+                          {updatesCount}
+                        </span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          favorites: !prev.favorites,
+                        }))
+                      }
+                      className={cn(
+                        pillBase,
+                        filters.favorites ? pillActive : pillIdle
+                      )}
+                    >
+                      <Heart
+                        className={cn(
+                          "h-3 w-3",
+                          filters.favorites && "fill-current"
+                        )}
+                      />
+                      <span>{t("library.favoritesGallery.title") || "Favorites"}</span>
+                    </button>
+
+                    {(ownedStoreGames.length > 0 || filters.installedOnly) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFilters(prev => ({
+                            ...prev,
+                            installedOnly: !prev.installedOnly,
+                          }))
+                        }
+                        className={cn(
+                          pillBase,
+                          filters.installedOnly ? pillActive : pillIdle
+                        )}
+                      >
+                        <HardDrive className="h-3 w-3" />
+                        <span>{t("library.filters.installedOnly") || "Installed"}</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          onlineGames: !prev.onlineGames,
+                        }))
+                      }
+                      className={cn(
+                        pillBase,
+                        filters.onlineGames ? pillActive : pillIdle
+                      )}
+                    >
+                      <Gamepad2 className="h-3 w-3" />
+                      <span>{t("library.filters.onlineGames") || "Online"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          vrOnly: !prev.vrOnly,
+                        }))
+                      }
+                      className={cn(pillBase, filters.vrOnly ? pillActive : pillIdle)}
+                    >
+                      <span>{t("library.filters.vrGames") || "VR"}</span>
+                    </button>
+
+                    {anyQuickFilter && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFilters(prev => ({
+                            ...prev,
+                            favorites: false,
+                            updatesOnly: false,
+                            installedOnly: false,
+                            onlineGames: false,
+                            vrOnly: false,
+                          }))
+                        }
+                        className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                        <span>{t("common.clear") || "Clear"}</span>
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
           {activeTab === "all" && selectionMode && (
-            <div className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-primary/20 bg-primary/5 py-1 pl-3 pr-1">
+            <div className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent py-1.5 pl-4 pr-2 shadow-sm">
               <span className="text-sm font-semibold text-primary" aria-live="polite">
                 {t("library.tools.selectedCount", {
                   count: selectedGames.length,
@@ -3007,9 +3241,9 @@ const Library = () => {
             </Button>
           )}
           {activeTab === "all" && showCloudSyncReminder && (
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
                   <CloudUpload className="h-4 w-4 text-amber-500" />
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -3040,6 +3274,22 @@ const Library = () => {
               </Button>
             </div>
           )}
+
+          {/* ── Featured Continue Playing Hero Banner ── */}
+          {activeTab === "all" &&
+            featuredHeroGame &&
+            !searchQuery.trim() &&
+            !selectionMode && (
+              <LibraryHeroBanner
+                game={featuredHeroGame}
+                hasUpdate={Boolean(
+                  featuredHeroGame.gameID && gameUpdates[featuredHeroGame.gameID]
+                )}
+                collapsed={heroCollapsed}
+                onToggleCollapse={() => setHeroCollapsed(prev => !prev)}
+                onPlay={handlePlayGame}
+              />
+            )}
 
           {/* ── All Games / Favorites tab ── */}
           {(activeTab === "all" ||
@@ -3107,9 +3357,7 @@ const Library = () => {
               );
 
               const gridClass =
-                viewMode === "list"
-                  ? "flex flex-col gap-2"
-                  : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+                viewMode === "list" ? "flex flex-col gap-2" : libraryGridClass;
 
               if (groupBy === "directory") {
                 // Build directory groups from all filtered games so each section is complete
@@ -4413,9 +4661,9 @@ const FavoritesGalleryCard = memo(
 
         <Card
           className={cn(
-            "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
+            "group relative overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300",
             !isRemoving &&
-              "press cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl",
+              "press cursor-pointer hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10",
             isRemoving &&
               "pointer-events-none duration-300 animate-out fade-out zoom-out-95 slide-out-to-bottom-2"
           )}
@@ -4440,7 +4688,7 @@ const FavoritesGalleryCard = memo(
 
               {/* Star badge top-left */}
               {rating > 0 && (
-                <div className="absolute left-2 top-2 z-20 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
+                <div className="absolute left-2 top-2 z-20 flex items-center gap-0.5 rounded-full border border-white/15 bg-black/60 px-2 py-0.5 backdrop-blur-md">
                   <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                   <span className="text-[11px] font-bold text-white">{rating}.0</span>
                 </div>
@@ -4460,7 +4708,7 @@ const FavoritesGalleryCard = memo(
                   return (
                     <div
                       className={cn(
-                        "absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white shadow backdrop-blur-sm",
+                        "absolute right-2 top-2 z-20 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow backdrop-blur-md",
                         STATUS_META[status].bg
                       )}
                       title={labels[status]}
@@ -5416,10 +5664,10 @@ const InstalledGameCard = memo(
           <div
             {...selectionAccessibility}
             className={cn(
-              "group relative flex items-center gap-4 rounded-xl border border-border/60 bg-card p-2 pr-4 shadow-sm transition-all duration-200",
+              "group relative flex items-center gap-4 rounded-2xl border border-border/40 bg-card/80 p-2.5 pr-4 shadow-sm backdrop-blur-sm transition-all duration-300",
               !game._isDownloading &&
                 !game._isQueued &&
-                "cursor-pointer hover:border-primary/30 hover:bg-accent/30 hover:shadow-md",
+                "cursor-pointer hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/5",
               (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
               selectionMode && !game.isCustom && "opacity-60",
               isSelected &&
@@ -5444,7 +5692,7 @@ const InstalledGameCard = memo(
             )}
 
             {/* Banner: hero art behind a dark scrim so light logos stay legible in any theme */}
-            <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm md:w-64">
+            <div className="relative h-[72px] w-56 shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm md:w-64">
               {heroData || imageData ? (
                 <img
                   src={heroData || imageData}
@@ -5651,10 +5899,10 @@ const InstalledGameCard = memo(
           <Card
             {...selectionAccessibility}
             className={cn(
-              "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
+              "group relative overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300",
               !game._isDownloading &&
                 !game._isQueued &&
-                "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+                "press hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10",
               (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
               selectionMode && !game.isCustom && "opacity-60",
               isSelected &&
@@ -5671,7 +5919,7 @@ const InstalledGameCard = memo(
           >
             {bulkDeleteHelp}
             {selectionMode && game.isCustom && (
-              <div className="absolute left-2 top-2 z-20 flex items-center justify-center rounded bg-white/80 p-0.5 shadow backdrop-blur-sm">
+              <div className="absolute left-2 top-2 z-20 flex items-center justify-center rounded-lg bg-white/80 p-0.5 shadow backdrop-blur-sm">
                 <input
                   type="checkbox"
                   checked={isSelected}
@@ -5704,9 +5952,9 @@ const InstalledGameCard = memo(
                 {/* Queued overlay */}
                 {game._isQueued && (
                   <>
-                    <div className="absolute inset-0 bg-black/60" />
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px]" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
+                      <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
                         <Loader className="h-3 w-3 animate-spin" />
                         Queued
                       </span>
@@ -5743,7 +5991,7 @@ const InstalledGameCard = memo(
                         />
                         {/* label */}
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="rounded bg-black/70 px-2 py-1 text-xs font-bold text-white">
+                          <span className="rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
                             {label}
                           </span>
                         </div>
@@ -5765,7 +6013,7 @@ const InstalledGameCard = memo(
                     !game.isCustom &&
                     !game._isDownloading &&
                     !game._isQueued && (
-                      <span className="rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm backdrop-blur-md">
+                      <span className="rounded-full border border-white/15 bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm backdrop-blur-md">
                         {t("library.newBadge")}
                       </span>
                     )}
@@ -5779,7 +6027,7 @@ const InstalledGameCard = memo(
                 {/* Hover overlay with title + actions */}
                 <div
                   className={cn(
-                    "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
+                    "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-3 transition-opacity duration-300",
                     selectionMode && "hidden",
                     isHovered && !selectionMode
                       ? "opacity-100"
@@ -5899,8 +6147,8 @@ const CloudOnlyGameCard = memo(
             }
           }}
           className={cn(
-            "press group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-            "press hover:-translate-y-1 hover:shadow-xl",
+            "press group relative cursor-pointer overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300",
+            "press hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           )}
         >
@@ -5928,7 +6176,7 @@ const CloudOnlyGameCard = memo(
                 <img
                   src={imageData}
                   alt={game.name}
-                  className="h-full w-full border-b border-border object-cover grayscale"
+                  className="h-full w-full border-b border-border/40 object-cover grayscale"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-muted">
@@ -5938,8 +6186,8 @@ const CloudOnlyGameCard = memo(
               {/* Cloud badge - different color for custom games */}
               <span
                 className={cn(
-                  "absolute left-2 top-2 z-20 flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-white",
-                  isCustomGame ? "bg-purple-500/90" : "bg-blue-500/90"
+                  "absolute left-2 top-2 z-20 flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur-md",
+                  isCustomGame ? "bg-purple-500/85" : "bg-blue-500/85"
                 )}
               >
                 <Cloud className="h-3 w-3" />
@@ -6125,8 +6373,8 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-        "press hover:-translate-y-1 hover:shadow-xl"
+        "group relative overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300",
+        "press hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10"
       )}
     >
       <CardContent className="p-0">
@@ -6145,7 +6393,7 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
             <img
               src={imageData}
               alt={game.game}
-              className="h-full w-full border-b border-border object-cover"
+              className="h-full w-full border-b border-border/40 object-cover"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-muted">
@@ -6153,7 +6401,7 @@ const PlayLaterGameCard = memo(({ game, onDownload, onRemove }) => {
             </div>
           )}
           {/* Play Later badge */}
-          <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded bg-amber-500/90 px-2 py-0.5 text-xs font-medium text-white">
+          <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded-full border border-white/15 bg-amber-500/85 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur-md">
             <Clock className="h-3 w-3" />
             {t("library.playLater.badge")}
           </span>
@@ -6276,8 +6524,8 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
     <>
       <Card
         className={cn(
-          "group relative overflow-hidden rounded-xl border border-border bg-card shadow-lg transition-all duration-200",
-          "press hover:-translate-y-1 hover:shadow-xl"
+          "group relative overflow-hidden rounded-2xl border border-border/40 bg-card/90 shadow-sm transition-all duration-300",
+          "press hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10"
         )}
       >
         <CardContent className="p-0">
@@ -6288,7 +6536,7 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
               <img
                 src={imageData}
                 alt={gameName}
-                className="h-full w-full border-b border-border object-cover grayscale"
+                className="h-full w-full border-b border-border/40 object-cover grayscale"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-muted">
@@ -6296,7 +6544,7 @@ const DeletedGameCard = memo(({ game, onRestore, onRemove, isRestoring }) => {
               </div>
             )}
             {/* History badge */}
-            <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded bg-muted-foreground/80 px-2 py-0.5 text-xs font-medium text-white">
+            <span className="absolute left-2 top-2 z-20 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur-md">
               <History className="h-3 w-3" />
               {t("library.history.badge") || "Removed"}
             </span>
