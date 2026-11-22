@@ -161,6 +161,8 @@ import {
 } from "@/lib/folderManager";
 import { API_URL } from "@/config/api";
 import { MENU_BAR_HEIGHT_PX } from "@/lib/appChromeGeometry";
+import ContinuePlaying from "@/components/library/ContinuePlaying";
+import recentGamesService from "@/services/library/recentGamesService";
 
 const Retro = React.lazy(() => import("./Retro"));
 
@@ -468,7 +470,7 @@ const Library = () => {
   const [sortMode, setSortMode] = useState(
     () => localStorage.getItem("library-sortMode") || "alpha"
   ); // "alpha" | "playtime"
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
@@ -1645,6 +1647,18 @@ const Library = () => {
     return () => clearTimeout(debounceTimer);
   }, [coverSearchQuery, searchGameCovers]);
 
+  // The last game played heads "All Games" until the person searches
+  const continueGame = useMemo(() => {
+    if (activeTab !== "all" || searchQuery) return null;
+    for (const recent of recentGamesService.getRecentGames()) {
+      const game = games.find(
+        item => !item.isFolder && (item.game || item.name) === recent.game
+      );
+      if (game) return { ...game, lastPlayed: recent.lastPlayed };
+    }
+    return null;
+  }, [games, activeTab, searchQuery]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -1810,9 +1824,9 @@ const Library = () => {
         />
       )}
       {/* ── Left Sidebar ─────────────────────────────────────────── */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border/30 shadow-[1px_0_0_0_hsl(var(--border)/0.15)]">
+      <aside className="flex w-60 shrink-0 flex-col border-r border-border/60">
         {/* ── User profile strip ── */}
-        <div className="mx-3 mt-3 overflow-hidden rounded-xl border border-border/40 bg-gradient-to-br from-primary/10 via-muted/30 to-muted/10">
+        <div className="mx-3 mt-3 overflow-hidden rounded-[12px] border border-border/70 bg-card">
           <div className="flex items-center gap-1 p-1.5">
             <button
               className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-foreground/5"
@@ -2121,23 +2135,21 @@ const Library = () => {
                   className={cn(
                     "relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
                     activeTab === tab.id
-                      ? "font-semibold text-primary"
+                      ? "font-semibold text-secondary"
                       : "font-medium text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                   )}
                 >
                   {activeTab === tab.id && (
                     <motion.span
                       layoutId="library-tab-active"
-                      className="absolute inset-0 rounded-lg bg-primary/10"
+                      className="absolute inset-0 rounded-lg bg-primary"
                       transition={{ type: "spring", stiffness: 400, damping: 34 }}
                     />
                   )}
                   <span
                     className={cn(
                       "relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-                      activeTab === tab.id
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground"
+                      activeTab === tab.id ? "text-secondary" : "text-muted-foreground"
                     )}
                   >
                     {tab.icon}
@@ -2148,7 +2160,7 @@ const Library = () => {
                       className={cn(
                         "relative min-w-[1.25rem] rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums transition-transform duration-150 group-hover/drag:translate-x-[-14px]",
                         activeTab === tab.id
-                          ? "bg-primary/20 text-primary"
+                          ? "bg-secondary/15 text-secondary"
                           : "bg-muted/80 text-muted-foreground"
                       )}
                     >
@@ -2495,7 +2507,7 @@ const Library = () => {
                           className={cn(
                             "flex h-full items-center justify-center rounded-md px-2.5 transition-all",
                             viewMode === mode
-                              ? "bg-primary/10 text-primary shadow-sm"
+                              ? "bg-primary text-secondary shadow-sm"
                               : "text-muted-foreground hover:bg-accent hover:text-foreground"
                           )}
                         >
@@ -2975,19 +2987,24 @@ const Library = () => {
               const meta = tabMeta[activeTab];
               if (!meta) return null;
               return (
-                <div className="mb-6 flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                    {React.cloneElement(meta.icon, { className: "h-6 w-6 text-primary" })}
-                  </div>
-                  <div className="flex flex-col gap-0">
-                    <h2 className="text-2xl font-bold leading-none text-foreground">
+                <>
+                  {continueGame && (
+                    <ContinuePlaying
+                      game={continueGame}
+                      locale={language}
+                      t={t}
+                      onOpen={handlePlayGame}
+                    />
+                  )}
+                  <div className="mb-5 flex flex-col gap-1">
+                    <h2 className="m-0 text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground">
                       {meta.title}
                     </h2>
                     {meta.subtitle && (
-                      <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
+                      <p className="m-0 text-sm text-muted-foreground">{meta.subtitle}</p>
                     )}
                   </div>
-                </div>
+                </>
               );
             })()}
 
@@ -5651,10 +5668,10 @@ const InstalledGameCard = memo(
           <Card
             {...selectionAccessibility}
             className={cn(
-              "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
+              "group relative overflow-hidden rounded-[10px] border border-border/70 bg-card transition-all duration-200",
               !game._isDownloading &&
                 !game._isQueued &&
-                "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+                "press hover:border-foreground/25",
               (game._isDownloading || game._isQueued) && "cursor-default opacity-60",
               selectionMode && !game.isCustom && "opacity-60",
               isSelected &&
@@ -5776,75 +5793,70 @@ const InstalledGameCard = memo(
                     </span>
                   )}
                 </div>
-                {/* Hover overlay with title + actions */}
+                {/* Caption over the art: title and play time, with the
+                    favorite button joining them on hover */}
                 <div
                   className={cn(
-                    "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
-                    selectionMode && "hidden",
-                    isHovered && !selectionMode
-                      ? "opacity-100"
-                      : "pointer-events-none opacity-0"
+                    "absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-16",
+                    selectionMode && "hidden"
                   )}
                 >
-                  <p className="mb-2 line-clamp-2 text-sm font-semibold leading-tight text-white">
-                    {game.game}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      {game.online && <Gamepad2 className="h-3.5 w-3.5 text-white/70" />}
-                      {game.dlc && <Gift className="h-3.5 w-3.5 text-white/70" />}
-                      {isRunning && (
-                        <span className="text-xs font-medium text-green-400">
-                          Playing
-                        </span>
+                  <div className="min-w-0">
+                    <h3 className="m-0 line-clamp-2 text-[15px] font-semibold leading-tight text-white">
+                      {game.game}
+                    </h3>
+                    {game._hasMultipleInstalls && (
+                      <p
+                        className="m-0 mt-0.5 truncate text-xs text-white/55"
+                        title={game.executable || game._sourceDir}
+                      >
+                        {game._sourceDir || game.executable}
+                      </p>
+                    )}
+                    <p className="m-0 mt-1.5 flex items-center gap-1.5 text-[13px] text-white/75">
+                      {isRunning ? (
+                        <span className="font-medium text-green-400">Playing</span>
+                      ) : (
+                        <>
+                          <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                          <span className="truncate">
+                            {(() => {
+                              const s = game.playTime;
+                              if (!s || s < 60) return t("library.neverPlayed2");
+                              const h = Math.floor(s / 3600);
+                              const m = Math.floor((s % 3600) / 60);
+                              if (h === 0) return `${m} minutes`;
+                              if (m === 0) return `${h} hours`;
+                              return `${h} hours ${m} minutes`;
+                            })()}
+                          </span>
+                        </>
                       )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-white hover:bg-white/20 hover:text-primary"
-                      onClick={e => {
-                        e.stopPropagation();
-                        onToggleFavorite(game.game || game.name);
-                      }}
-                    >
-                      <Heart
-                        className={cn(
-                          "h-4 w-4",
-                          isFavorite
-                            ? "fill-primary text-primary"
-                            : "fill-none text-white"
-                        )}
-                      />
-                    </Button>
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    aria-label={
+                      isFavorite ? t("gameCard.unfavorite") : t("gameCard.favorite")
+                    }
+                    title={isFavorite ? t("gameCard.unfavorite") : t("gameCard.favorite")}
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-white/15 bg-black/40 text-white backdrop-blur-sm transition-all hover:border-white/40 hover:bg-white/10",
+                      isFavorite || isHovered ? "opacity-100" : "opacity-0"
+                    )}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onToggleFavorite(game.game || game.name);
+                    }}
+                  >
+                    <Heart
+                      className={cn("h-4 w-4", isFavorite && "fill-white")}
+                      strokeWidth={1.75}
+                    />
+                  </button>
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col items-start gap-1 px-3 py-2">
-              <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">
-                {game.game}
-              </h3>
-              {game._hasMultipleInstalls && (
-                <p
-                  className="w-full truncate text-xs text-muted-foreground"
-                  title={game.executable || game._sourceDir}
-                >
-                  {game._sourceDir || game.executable}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {(() => {
-                  const s = game.playTime;
-                  if (!s || s < 60) return t("library.neverPlayed");
-                  const h = Math.floor(s / 3600);
-                  const m = Math.floor((s % 3600) / 60);
-                  if (h === 0) return `${m} minutes`;
-                  if (m === 0) return `${h} hours`;
-                  return `${h} hours ${m} minutes`;
-                })()}
-              </p>
-            </CardFooter>
           </Card>
         )}
       </>

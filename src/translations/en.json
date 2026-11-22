@@ -3054,6 +3054,11 @@
     "confirmDelete": "Woah!",
     "confirmRemoveFolderDesc": "Are you sure you want to remove this folder? All games inside will be moved back to your main library.",
     "confirmRemoveFolderTitle": "Remove Folder?",
+    "continue": {
+      "lastPlayed": "Last played",
+      "open": "Open game",
+      "title": "Continue playing"
+    },
     "coverSearchError": "Error searching for image",
     "createShortcut": "Create Desktop Shortcut",
     "createStartMenuShortcut": "Add to Start Menu",
