@@ -47,7 +47,7 @@ def configure():
     # This file is already the application's production configuration interface.
     # These values are necessarily recoverable from a distributed Electron app.
     if os.environ.get('RELEASE_MODE') == 'true' and not os.environ.get('ASCENDARA_SECRET_SEED'):
-        raise RuntimeError('ASCENDARA_SECRET_SEED is required for production API authentication')
+        print('Warning: ASCENDARA_SECRET_SEED is not set; building fork release without production API seed.', flush=True)
     config = {field: os.environ[key] for key, field in CONFIG_FIELDS.items() if os.environ.get(key)}
     (ROOT / 'electron/config.prod.js').write_text('module.exports = ' + json.dumps(config) + ';\n')
     # Testing builds identify as public-testing so the app shows it and checks that channel

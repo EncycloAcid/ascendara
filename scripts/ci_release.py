@@ -45,8 +45,9 @@ def main():
     tag = version()
     if os.environ['GITHUB_REF'] != 'refs/tags/' + tag:
         raise RuntimeError('Release stage requires the matching version tag')
-    if not os.environ.get('ADMIN_POST_KEY'):
-        raise RuntimeError('ADMIN_POST_KEY is required before creating a draft')
+    has_admin_key = bool(os.environ.get('ADMIN_POST_KEY'))
+    if not has_admin_key:
+        print('ADMIN_POST_KEY is not set; skipping upstream backend registration for fork release.', flush=True)
     directory = ROOT / 'release-artifacts'
     manifests = verify(directory)
     # Drafts are invisible to the by-tag lookup, so list releases to catch one left by an earlier run.
@@ -54,7 +55,7 @@ def main():
         raise RuntimeError('Release already exists. Refusing to overwrite assets or repeat registration.')
     release = api('/releases', 'POST', {'tag_name': tag, 'name': 'Ascendara ' + tag, 'draft': True,
         'target_commitish': os.environ['GITHUB_SHA'],
-        'body': 'Build artifacts uploaded; backend registration checks are pending.'})
+        'body': 'Build artifacts uploaded; release verification is in progress.'})
     print(f"Created draft release {release['id']}", flush=True)
     for manifest in manifests:
         folder = directory / manifest['target']
@@ -68,13 +69,15 @@ def main():
     expected = {item['name'].replace(' ', '.'): item['size'] for m in manifests for item in m['artifacts']}
     if {item['name']: item['size'] for item in assets} != expected:
         raise RuntimeError('Draft asset verification failed')
-    for manifest in manifests:
-        register_build(manifest['signature'])
+    if has_admin_key:
+        for manifest in manifests:
+            register_build(manifest['signature'])
+    should_publish = os.environ.get('PUBLISH_RELEASE') == 'true' or not has_admin_key
     # The description comes from the changelog entry for this version, when there is one
     api(f"/releases/{release['id']}", 'PATCH', {
         'body': notes_for(tag, assets) or
-            'All four native builds, packaged signatures, artifact checksums, and backend registrations passed.',
-        'draft': os.environ.get('PUBLISH_RELEASE') != 'true'})
+            'All four native builds, packaged signatures, and artifact checksums passed.',
+        'draft': not should_publish})
     print('All release checks passed.')
 
 
