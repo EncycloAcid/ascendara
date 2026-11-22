@@ -326,56 +326,15 @@ export function ModsSection({
 
 /** Trainer and Nexus mods for the game; both need Ascend access. */
 export default function ModsTrainersTab({
-  hasAscendAccess,
-  isAuthenticated,
-  onGetAscend,
   showTrainer,
   trainerProps,
   showMods,
   modsProps,
 }) {
-  const { t } = useLanguage();
   return (
     <div className="space-y-4">
-      {showTrainer &&
-        (hasAscendAccess ? (
-          <TrainerSection {...trainerProps} />
-        ) : (
-          <AscendPromo
-            icon={Bolt}
-            title={t("gameScreen.trainersTitle")}
-            subtitle={t("gameScreen.trainerAvailable")}
-            description={
-              !isAuthenticated
-                ? t("gameScreen.trainersAscendPromo")
-                : t("gameScreen.trainersAscendRequired")
-            }
-            isAuthenticated={isAuthenticated}
-            onGetAscend={onGetAscend}
-          />
-        ))}
-      {showMods &&
-        (hasAscendAccess ? (
-          <ModsSection {...modsProps} />
-        ) : (
-          <AscendPromo
-            icon={Puzzle}
-            title={t("gameScreen.modsTitle")}
-            subtitle={
-              modsProps.nexusGameData &&
-              t("gameScreen.modsAvailable", {
-                count: modsProps.nexusGameData.modCount || 0,
-              })
-            }
-            description={
-              !isAuthenticated
-                ? t("gameScreen.modsAscendPromo")
-                : t("gameScreen.modsAscendRequired")
-            }
-            isAuthenticated={isAuthenticated}
-            onGetAscend={onGetAscend}
-          />
-        ))}
+      {showTrainer && <TrainerSection {...trainerProps} />}
+      {showMods && <ModsSection {...modsProps} />}
     </div>
   );
 }

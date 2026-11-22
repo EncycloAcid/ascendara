@@ -73,12 +73,7 @@ export default function StoreAccountsDialog({
 
   useEffect(() => {
     if (!open) return;
-    verifyAscendAccess()
-      .then(access => {
-        if (mounted.current)
-          setHasAscend(Boolean(access.hasAccess || access.isSubscribed || access.isVerified));
-      })
-      .catch(() => {});
+    setHasAscend(true);
   }, [open]);
 
   const act = async (action, store) => {

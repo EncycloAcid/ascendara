@@ -374,19 +374,7 @@ function Settings() {
   }, []);
 
   useEffect(() => {
-    const checkSubscription = async () => {
-      try {
-        const result = await verifyAscendAccess();
-        setHasAscendSubscription(
-          result.isSubscribed === true ||
-            result.isVerified === true ||
-            result.hasAccess === true
-        );
-      } catch (e) {
-        setHasAscendSubscription(false);
-      }
-    };
-    checkSubscription();
+    setHasAscendSubscription(true);
   }, []);
 
   useEffect(() => {

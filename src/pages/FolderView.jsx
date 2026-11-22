@@ -78,8 +78,8 @@ const GameCard = React.memo(
     return (
       <Card
         className={cn(
-          "group relative overflow-hidden rounded-xl border border-border bg-card shadow-md transition-all duration-200",
-          "press hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl",
+          "group relative overflow-hidden rounded-[12px] border border-border/70 bg-card shadow-md transition-all duration-200",
+          "press hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl",
           "cursor-pointer"
         )}
         onClick={e => {
@@ -103,69 +103,68 @@ const GameCard = React.memo(
               </div>
             )}
             {hasUpdate && (
-              <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary">
+              <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-secondary shadow-sm">
                 <Import className="h-3 w-3" />
                 {t("gameScreen.updateBadge")}
               </span>
             )}
             <div
               className={cn(
-                "absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 transition-opacity duration-200",
-                isHovered ? "opacity-100" : "opacity-0"
+                "absolute right-2 top-2 z-10 flex items-center gap-1 transition-opacity duration-200",
+                isHovered || isFavorite ? "opacity-100" : "opacity-0"
               )}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  {game.online && <Gamepad2 className="h-3.5 w-3.5 text-white/70" />}
-                  {game.dlc && <Gift className="h-3.5 w-3.5 text-white/70" />}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    className="rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
-                    title={t("library.removeFromFolder")}
-                    onClick={e => {
-                      e.stopPropagation();
-                      onRemove(gameId);
-                    }}
-                  >
-                    <FolderUp className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    className="rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
-                    title={
-                      isFavorite ? t("library.removeFavorite") : t("library.addFavorite")
-                    }
-                    onClick={e => {
-                      e.stopPropagation();
-                      onToggleFavorite(gameId);
-                    }}
-                  >
-                    <Heart
-                      className={cn(
-                        "h-3.5 w-3.5",
-                        isFavorite ? "fill-primary text-primary" : "fill-none text-white"
-                      )}
-                    />
-                  </button>
-                </div>
+              <button
+                className={cn(
+                  "rounded-full border border-white/15 bg-black/55 p-1.5 text-white backdrop-blur-md transition-all hover:bg-black/80",
+                  !isHovered && "pointer-events-none opacity-0"
+                )}
+                title={t("library.removeFromFolder")}
+                onClick={e => {
+                  e.stopPropagation();
+                  onRemove(gameId);
+                }}
+              >
+                <FolderUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                className="rounded-full border border-white/15 bg-black/55 p-1.5 text-white backdrop-blur-md transition-colors hover:bg-black/80"
+                title={
+                  isFavorite ? t("library.removeFavorite") : t("library.addFavorite")
+                }
+                onClick={e => {
+                  e.stopPropagation();
+                  onToggleFavorite(gameId);
+                }}
+              >
+                <Heart
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    isFavorite ? "fill-primary text-primary" : "fill-none text-white"
+                  )}
+                />
+              </button>
+            </div>
+            <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-10">
+              <div className="flex items-center gap-1.5">
+                <h3 className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight text-white drop-shadow-sm">
+                  {gameId}
+                </h3>
+                {game.online && <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-white/75" />}
+                {game.dlc && <Gift className="h-3.5 w-3.5 shrink-0 text-white/75" />}
               </div>
+              <p className="mt-0.5 text-xs text-white/75">
+                {game.playTime !== undefined
+                  ? game.playTime < 60
+                    ? t("library.lessThanMinute")
+                    : game.playTime < 3600
+                      ? `${Math.floor(game.playTime / 60)}m`
+                      : `${Math.floor(game.playTime / 3600)}h`
+                  : t("library.neverPlayed")}
+              </p>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col items-start gap-1 px-3 py-2">
-          <h3 className="w-full truncate text-sm font-semibold leading-tight text-foreground">
-            {gameId}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {game.playTime !== undefined
-              ? game.playTime < 60
-                ? t("library.lessThanMinute")
-                : game.playTime < 3600
-                  ? `${Math.floor(game.playTime / 60)}m`
-                  : `${Math.floor(game.playTime / 3600)}h`
-              : t("library.neverPlayed")}
-          </p>
-        </CardFooter>
       </Card>
     );
   }
@@ -207,23 +206,8 @@ const FolderView = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [renameError, setRenameError] = useState("");
-  const { user } = useAuth();
-  const [hasAscendAccess, setHasAscendAccess] = useState(false);
+  const [hasAscendAccess] = useState(true);
   const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) {
-      setHasAscendAccess(false);
-      return;
-    }
-    verifyAscendAccess()
-      .then(result => !cancelled && setHasAscendAccess(!!result?.hasAccess))
-      .catch(() => !cancelled && setHasAscendAccess(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   // Same check the library runs; answers are shared through gameService's cache
   const updateCheckKey = folderGames

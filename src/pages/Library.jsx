@@ -341,11 +341,19 @@ const Library = () => {
   useEffect(() => {
     safeSetItem("library-viewMode", viewMode);
   }, [viewMode]);
+  const [cardSize, setCardSize] = useState(() => {
+    const saved = localStorage.getItem("library-card-size");
+    return ["compact", "standard", "large"].includes(saved) ? saved : "standard";
+  });
+  useEffect(() => {
+    safeSetItem("library-card-size", cardSize);
+  }, [cardSize]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [filters, setFilters] = useState({
     favorites: false,
     vrOnly: false,
     onlineGames: false,
+    updatesOnly: false,
     // Remembered so connected store libraries stay out of the way between launches
     installedOnly: localStorage.getItem("library-installedOnly") === "true",
   });
@@ -710,12 +718,18 @@ const Library = () => {
       const matchesVr = !filters.vrOnly || game.isVr;
       const matchesOnline = !filters.onlineGames || game.online;
       const matchesInstalled = !filters.installedOnly || !game._isStoreOwned;
+      const matchesUpdates =
+        !filters.updatesOnly ||
+        (game.isFolder
+          ? (game.items || []).some(item => item.gameID && Boolean(gameUpdates[item.gameID]))
+          : Boolean(game.gameID && gameUpdates[game.gameID]));
       return (
         matchesSearch &&
         matchesFavorites &&
         matchesVr &&
         matchesOnline &&
-        matchesInstalled
+        matchesInstalled &&
+        matchesUpdates
       );
     })
     .sort((a, b) => {
@@ -1005,13 +1019,9 @@ const Library = () => {
     [games]
   );
 
-  // Check for game updates when games are loaded (only for Ascend subscribers)
+  // Check for game updates when games are loaded
   useEffect(() => {
     if (!isInitialized) return;
-    if (!user || !ascendAccess.hasAccess) {
-      setGameUpdates({});
-      return;
-    }
     if (!updateCheckKey) {
       setGameUpdates({});
       return;
@@ -1682,9 +1692,16 @@ const Library = () => {
       ? filteredGames.filter(g => !g.isFolder && favorites.includes(g.game || g.name))
       : filteredGames;
 
-  const hasAscend = Boolean(
-    ascendAccess.hasAccess || ascendAccess.isSubscribed || ascendAccess.isVerified
-  );
+  const updatesCount = Object.keys(gameUpdates).length;
+
+  const libraryGridClass =
+    cardSize === "compact"
+      ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8"
+      : cardSize === "large"
+        ? "grid grid-cols-2 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+        : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+
+  const hasAscend = true;
   const steamAccount = storeLibrary.accounts.find(
     account => account.store === "steam" && account.connected
   );
@@ -2489,35 +2506,72 @@ const Library = () => {
               {(activeTab === "all" ||
                 activeTab === "favorites" ||
                 activeTab === "hiddenFolders") && (
-                <div
-                  data-tour="library-view"
-                  className="flex h-9 items-center rounded-lg border border-border/60 bg-card p-0.5"
-                >
-                  {[
-                    { mode: "grid", icon: LayoutGrid, label: t("library.view.grid") },
-                    { mode: "list", icon: ListIcon, label: t("library.view.list") },
-                  ].map(({ mode, icon: Icon, label }) => (
-                    <Tooltip key={mode}>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={label}
-                          aria-pressed={viewMode === mode}
-                          onClick={() => setViewMode(mode)}
-                          className={cn(
-                            "flex h-full items-center justify-center rounded-md px-2.5 transition-all",
-                            viewMode === mode
-                              ? "bg-primary text-secondary shadow-sm"
-                              : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                          )}
-                        >
-                          <Icon className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent className="text-secondary">{label}</TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
+                <>
+                  <div
+                    data-tour="library-view"
+                    className="flex h-9 items-center rounded-lg border border-border/60 bg-card p-0.5"
+                  >
+                    {[
+                      { mode: "grid", icon: LayoutGrid, label: t("library.view.grid") },
+                      { mode: "list", icon: ListIcon, label: t("library.view.list") },
+                    ].map(({ mode, icon: Icon, label }) => (
+                      <Tooltip key={mode}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={label}
+                            aria-pressed={viewMode === mode}
+                            onClick={() => setViewMode(mode)}
+                            className={cn(
+                              "flex h-full items-center justify-center rounded-md px-2.5 transition-all",
+                              viewMode === mode
+                                ? "bg-primary text-secondary shadow-sm"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-secondary">{label}</TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+
+                  {viewMode === "grid" && (
+                    <div
+                      aria-label="Card density"
+                      className="hidden h-9 items-center rounded-lg border border-border/60 bg-card p-0.5 sm:flex"
+                    >
+                      {[
+                        { size: "compact", short: "S", label: "Compact cards" },
+                        { size: "standard", short: "M", label: "Standard cards" },
+                        { size: "large", short: "L", label: "Large cards" },
+                      ].map(({ size, short, label }) => (
+                        <Tooltip key={size}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={label}
+                              aria-pressed={cardSize === size}
+                              onClick={() => setCardSize(size)}
+                              className={cn(
+                                "flex h-full min-w-[1.65rem] items-center justify-center rounded-md px-1.5 text-xs font-semibold transition-all",
+                                cardSize === size
+                                  ? "bg-primary text-secondary shadow-sm"
+                                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                              )}
+                            >
+                              {short}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="text-secondary">
+                            {label}
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
               <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
@@ -2837,6 +2891,167 @@ const Library = () => {
             </TooltipProvider>
           </div>
 
+          {/* Quick-filter pills bar */}
+          {activeTab === "all" && !selectionMode && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {(() => {
+                const anyQuickFilter =
+                  filters.favorites ||
+                  filters.updatesOnly ||
+                  filters.installedOnly ||
+                  filters.onlineGames ||
+                  filters.vrOnly;
+                const pillBase =
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all";
+                const pillActive =
+                  "border-primary bg-primary text-secondary shadow-sm";
+                const pillIdle =
+                  "border-border/60 bg-card text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground";
+
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          favorites: false,
+                          updatesOnly: false,
+                          installedOnly: false,
+                          onlineGames: false,
+                          vrOnly: false,
+                        }))
+                      }
+                      className={cn(pillBase, !anyQuickFilter ? pillActive : pillIdle)}
+                    >
+                      {t("common.all") || "All"}
+                    </button>
+
+                    {updatesCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFilters(prev => ({
+                            ...prev,
+                            updatesOnly: !prev.updatesOnly,
+                          }))
+                        }
+                        className={cn(
+                          pillBase,
+                          filters.updatesOnly ? pillActive : pillIdle
+                        )}
+                      >
+                        <Import className="h-3 w-3" />
+                        <span>{t("gameScreen.updateBadge") || "Updates"}</span>
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
+                            filters.updatesOnly
+                              ? "bg-secondary/20 text-secondary"
+                              : "bg-primary text-secondary"
+                          )}
+                        >
+                          {updatesCount}
+                        </span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          favorites: !prev.favorites,
+                        }))
+                      }
+                      className={cn(
+                        pillBase,
+                        filters.favorites ? pillActive : pillIdle
+                      )}
+                    >
+                      <Heart
+                        className={cn(
+                          "h-3 w-3",
+                          filters.favorites && "fill-current"
+                        )}
+                      />
+                      <span>{t("library.favoritesGallery.title") || "Favorites"}</span>
+                    </button>
+
+                    {(ownedStoreGames.length > 0 || filters.installedOnly) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFilters(prev => ({
+                            ...prev,
+                            installedOnly: !prev.installedOnly,
+                          }))
+                        }
+                        className={cn(
+                          pillBase,
+                          filters.installedOnly ? pillActive : pillIdle
+                        )}
+                      >
+                        <HardDrive className="h-3 w-3" />
+                        <span>{t("library.filters.installedOnly") || "Installed"}</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          onlineGames: !prev.onlineGames,
+                        }))
+                      }
+                      className={cn(
+                        pillBase,
+                        filters.onlineGames ? pillActive : pillIdle
+                      )}
+                    >
+                      <Gamepad2 className="h-3 w-3" />
+                      <span>{t("library.filters.onlineGames") || "Online"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters(prev => ({
+                          ...prev,
+                          vrOnly: !prev.vrOnly,
+                        }))
+                      }
+                      className={cn(pillBase, filters.vrOnly ? pillActive : pillIdle)}
+                    >
+                      <span>{t("library.filters.vrGames") || "VR"}</span>
+                    </button>
+
+                    {anyQuickFilter && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFilters(prev => ({
+                            ...prev,
+                            favorites: false,
+                            updatesOnly: false,
+                            installedOnly: false,
+                            onlineGames: false,
+                            vrOnly: false,
+                          }))
+                        }
+                        className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                        <span>{t("common.clear") || "Clear"}</span>
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
           {activeTab === "all" && selectionMode && (
             <div className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-primary/20 bg-primary/5 py-1 pl-3 pr-1">
               <span className="text-sm font-semibold text-primary" aria-live="polite">
@@ -3124,9 +3339,7 @@ const Library = () => {
               );
 
               const gridClass =
-                viewMode === "list"
-                  ? "flex flex-col gap-2"
-                  : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+                viewMode === "list" ? "flex flex-col gap-2" : libraryGridClass;
 
               if (groupBy === "directory") {
                 // Build directory groups from all filtered games so each section is complete

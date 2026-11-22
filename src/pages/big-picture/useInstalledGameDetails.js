@@ -734,7 +734,7 @@ function useInstalledGameDetails({
 
   // A catalog game with a newer version gets an "Update" entry in the menu
   const [updateInfo, setUpdateInfo] = useState(null);
-  const [canAutoUpdateGame, setCanAutoUpdateGame] = useState(false);
+  const [canAutoUpdateGame] = useState(true);
   useEffect(() => {
     let cancelled = false;
     if (game.isCustom || !game.gameID) return undefined;
@@ -744,14 +744,10 @@ function useInstalledGameDetails({
         result => !cancelled && setUpdateInfo(result?.updateAvailable ? result : null)
       )
       .catch(() => {});
-    if (user)
-      verifyAscendAccess()
-        .then(result => !cancelled && setCanAutoUpdateGame(Boolean(result?.hasAccess)))
-        .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [game.gameID, game.version, game.isCustom, user]);
+  }, [game.gameID, game.version, game.isCustom]);
 
   const startUpdate = () => {
     if (!canAutoUpdateGame) {
