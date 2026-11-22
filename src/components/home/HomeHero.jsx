@@ -151,7 +151,7 @@ const HomeHero = memo(
           {/* Shades keep the menu bar, copy and stats readable over any artwork,
               and fade the art into the page below */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-background/80 to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-3/5 bg-gradient-to-l from-background/80 via-background/30 to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-background/90 via-background/55 to-transparent" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-background via-background/70 to-transparent" />
 
           <div
@@ -222,7 +222,7 @@ const HomeHero = memo(
               <HeroLogo logo={logo} title={title} />
 
               {summary ? (
-                <p className="m-0 line-clamp-3 max-w-[520px] text-sm leading-[1.6] text-foreground/70">
+                <p className="m-0 line-clamp-3 max-w-[520px] text-sm leading-[1.6] text-foreground/75 [text-shadow:0_1px_12px_rgb(var(--color-background)/0.9)]">
                   {summary}
                 </p>
               ) : (
