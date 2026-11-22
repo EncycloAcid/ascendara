@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import GameContextMenu from "@/components/GameContextMenu";
 import HomeHero from "@/components/home/HomeHero";
-import PopularShelf from "@/components/home/PopularShelf";
+import PopularShelf, { SHELF_HEIGHT } from "@/components/home/PopularShelf";
 import WeeklyStats from "@/components/home/WeeklyStats";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -885,14 +885,14 @@ const Home = memo(() => {
             marginRight: "-1rem",
           }}
         >
-          <Skeleton className="h-[clamp(560px,88vh,920px)] w-full rounded-none" />
+          <Skeleton className="h-[clamp(560px,calc(100vh-16px),1080px)] w-full rounded-none" />
         </div>
         <div className="space-y-5 px-[clamp(8px,2.5vw,40px)]">
           <div className="flex items-center justify-between">
             <Skeleton className="h-7 w-32" />
             <Skeleton className="h-11 w-72 rounded-[10px]" />
           </div>
-          <div className="flex h-[clamp(300px,40vh,420px)] gap-4 overflow-hidden">
+          <div className="flex gap-4 overflow-hidden" style={{ height: SHELF_HEIGHT }}>
             <Skeleton className="aspect-[565/400] h-full shrink-0 rounded-[10px]" />
             {[0, 1, 2, 3].map(i => (
               <Skeleton
@@ -958,8 +958,6 @@ const Home = memo(() => {
             setCurrentSlide(index);
             setAutoPlay(false);
           }}
-          onPrev={handlePrevSlide}
-          onNext={handleNextSlide}
           onOpen={openHeroGame}
           onDownload={handleStartDownload}
           onTogglePlayLater={handlePlayLaterFromContext}

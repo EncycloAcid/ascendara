@@ -29,6 +29,7 @@ import { recordLibrarySnapshot } from "@/services/library/weeklyActivityService"
 import {
   NAVIGATION_RAIL_WIDTH_PX,
   NAVIGATION_RAIL_TILE_PX,
+  NAVIGATION_RAIL_ICON_PX,
 } from "@/lib/navigationGeometry";
 import { MENU_BAR_HEIGHT_PX } from "@/lib/appChromeGeometry";
 import { cn, imageDataUrlFromBase64, sanitizeText } from "@/lib/utils";
@@ -37,12 +38,20 @@ import { cn, imageDataUrlFromBase64, sanitizeText } from "@/lib/utils";
 const MAX_RAIL_GAMES = 4;
 const railImageCache = new Map(); // game name -> data URL
 
-const tileClass = active =>
+const ACTIVE_TILE =
+  "bg-primary text-secondary shadow-[0_0_24px_rgb(var(--color-primary)/0.15)]";
+
+// Solid tiles fill the center tray; page buttons below it are bare icons that
+// only take a tile's fill once hovered or current
+const tileClass = (active, ghost = false) =>
   cn(
-    "group relative flex shrink-0 items-center justify-center rounded-[10px] outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring",
+    "group relative flex shrink-0 items-center justify-center outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring",
+    ghost ? "rounded-[10px]" : "rounded-[8px]",
     active
-      ? "bg-primary text-secondary shadow-[0_0_24px_rgb(var(--color-primary)/0.15)]"
-      : "bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground"
+      ? ACTIVE_TILE
+      : ghost
+        ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+        : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"
   );
 
 const Badge = ({ count }) =>
@@ -61,7 +70,7 @@ const RailTooltip = ({ label, children }) => (
   </Tooltip>
 );
 
-const RailGameThumb = memo(({ game, active, onOpen }) => {
+const RailGameThumb = memo(({ game, active, onOpen, className }) => {
   const name = game.game || game.name;
   const [image, setImage] = useState(() => railImageCache.get(name) || null);
 
@@ -100,16 +109,21 @@ const RailGameThumb = memo(({ game, active, onOpen }) => {
         type="button"
         onClick={() => onOpen(game)}
         aria-label={label}
-        className={cn(tileClass(false), active && "ring-2 ring-primary")}
+        aria-current={active ? "page" : undefined}
+        className={cn(tileClass(false), active && "ring-2 ring-primary", className)}
         style={{ width: NAVIGATION_RAIL_TILE_PX, height: NAVIGATION_RAIL_TILE_PX }}
       >
-        <span className="absolute inset-1 overflow-hidden rounded-md bg-card">
+        <span className="absolute inset-[5px] overflow-hidden rounded-[6px] bg-card">
           {image ? (
+            // Covers rest in grayscale and take their color on hover or while open
             <img
               src={image}
               alt=""
               draggable="false"
-              className="h-full w-full object-cover grayscale-[35%] transition duration-300 group-hover:scale-105 group-hover:grayscale-0"
+              className={cn(
+                "h-full w-full object-cover transition duration-300 group-hover:scale-105 group-hover:grayscale-0 group-focus-visible:grayscale-0",
+                !active && "grayscale"
+              )}
             />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">
@@ -142,11 +156,11 @@ const RailAvatar = ({ active, label }) => {
         data-nav-path="/profile"
         aria-label={label}
         className={cn(
-          "group relative flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-background/60 outline-none ring-1 ring-border/70 transition focus-visible:ring-2 focus-visible:ring-ring",
+          "group relative flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-full bg-card outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
           active && "ring-2 ring-primary"
         )}
       >
-        <span className="flex h-[48px] w-[48px] items-center justify-center overflow-hidden rounded-full bg-muted text-muted-foreground transition-colors group-hover:text-foreground">
+        <span className="flex h-[50px] w-[50px] items-center justify-center overflow-hidden rounded-full bg-muted text-muted-foreground transition-colors group-hover:text-foreground">
           {photo && !failed ? (
             <img
               src={photo}
@@ -401,8 +415,9 @@ const Navigation = memo(() => {
     [navigate]
   );
 
-  const renderItem = item => {
+  const renderItem = (item, ghost = false) => {
     if (item.hidden) return null;
+    const size = ghost ? NAVIGATION_RAIL_ICON_PX : NAVIGATION_RAIL_TILE_PX;
     const active = isActive(item.path);
     const badge =
       item.path === "/downloads"
@@ -423,8 +438,8 @@ const Navigation = memo(() => {
           }}
           // Fetch Ascend's data on the way to the click
           onPointerEnter={item.path === "/ascend" ? prefetchAscendData : undefined}
-          className={tileClass(active)}
-          style={{ width: NAVIGATION_RAIL_TILE_PX, height: NAVIGATION_RAIL_TILE_PX }}
+          className={tileClass(active, ghost)}
+          style={{ width: size, height: size }}
         >
           <item.icon className="h-5 w-5" strokeWidth={1.75} />
           <Badge count={badge} />
@@ -452,33 +467,35 @@ const Navigation = memo(() => {
       >
         <RailAvatar active={isActive("/profile")} label={t("common.profile")} />
 
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-4">
-          <div className="flex flex-col items-center gap-1.5 rounded-[14px] border border-border/60 bg-card/80 p-1.5 shadow-[0_8px_32px_rgb(0_0_0/0.35)]">
-            {pageItems.map(renderItem)}
+        {/* The tray: recently played games and search */}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden py-4">
+          <div className="flex flex-col items-center gap-[6px] rounded-[12px] border border-border/40 bg-card p-[5px]">
             {recentGames.length > 0 && (
-              // Short windows keep the page buttons and drop the game covers
+              // Shorter windows show fewer covers so the page buttons below still fit
               <div
                 data-tour="home-recent"
-                className="flex flex-col items-center gap-1.5 [@media(max-height:760px)]:hidden"
+                className="flex flex-col items-center gap-[6px] [@media(max-height:639px)]:hidden"
               >
-                <div className="my-0.5 h-px w-8 bg-border/70" aria-hidden="true" />
-                {recentGames.map(game => (
+                {recentGames.map((game, index) => (
                   <RailGameThumb
                     key={game.game || game.name}
                     game={game}
                     active={openGameName === (game.game || game.name)}
                     onOpen={openGame}
+                    className={
+                      index >= 2 ? "[@media(max-height:819px)]:hidden" : undefined
+                    }
                   />
                 ))}
-                <div className="my-0.5 h-px w-8 bg-border/70" aria-hidden="true" />
               </div>
             )}
             {renderItem(searchItem)}
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-1.5">
-          {footerItems.map(renderItem)}
+        <div className="flex flex-col items-center gap-1">
+          {pageItems.map(item => renderItem(item, true))}
+          {footerItems.map(item => renderItem(item, true))}
         </div>
       </nav>
     </TooltipProvider>

@@ -13,6 +13,12 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import steamGridImageService from "@/services/images/steamGridImageService";
 import { cn, sanitizeText } from "@/lib/utils";
 
+// Cards share one height, sized so the wide card and three portrait cards fill
+// the row exactly: 565/400 + 3 × 263/400 widths, plus three 16px gaps. The row
+// width is the window minus the rail, the main column's padding and Home's.
+export const SHELF_HEIGHT =
+  "clamp(260px, calc((100vw - var(--app-rail-width, 0px) - 2rem - 2 * clamp(8px, 2.5vw, 40px) - 48px) / 3.3975), 460px)";
+
 const INITIAL_COUNT = 12;
 const LOAD_MORE_COUNT = 12;
 
@@ -311,8 +317,8 @@ const PopularShelf = ({
       <div
         ref={scrollRef}
         role="tabpanel"
-        className="scrollbar-hide flex h-[clamp(300px,40vh,420px)] snap-x gap-4 overflow-x-auto"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="scrollbar-hide flex snap-x gap-4 overflow-x-auto"
+        style={{ height: SHELF_HEIGHT, scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {visibleGames.map((game, index) => (
           <ShelfCard

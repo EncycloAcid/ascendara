@@ -1,8 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import {
   CalendarClock,
-  ChevronLeft,
-  ChevronRight,
   Download,
   Gift,
   Globe,
@@ -14,36 +12,47 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatGroup, StatTile } from "@/components/home/StatTile";
 import steamGridImageService from "@/services/images/steamGridImageService";
+import gameInfoService from "@/services/games/gameInfoService";
 import { cn, sanitizeText } from "@/lib/utils";
 
-// Logos come from the heavier SteamGrid lookup, so each title is resolved at
-// most once per session (the service also caches the result on disk)
-const logoCache = new Map(); // game name -> logo URL or null
+// The logo (SteamGrid) and the one-line pitch (Steam) are both lookups, so each
+// title is resolved at most once per session; both services also keep their
+// own on-disk caches between launches
+const detailsCache = new Map(); // game name -> { logo, summary }
 
-const useGameLogo = name => {
-  const [logo, setLogo] = useState(() => (name ? logoCache.get(name) : undefined));
+const lookUpDetails = async name => {
+  const cachedLogo = steamGridImageService.peek?.(name)?.logo;
+  const [logo, summary] = await Promise.all([
+    cachedLogo ||
+      steamGridImageService
+        .getFullAssets(name)
+        .then(assets => steamGridImageService.pickUrl(assets, "logo"))
+        .catch(() => null),
+    gameInfoService
+      .getGameDetails(name)
+      .then(details => details?.summary?.trim() || null)
+      .catch(() => null),
+  ]);
+  return { logo, summary };
+};
+
+const useHeroDetails = name => {
+  const [details, setDetails] = useState(() => (name && detailsCache.get(name)) || {});
 
   useEffect(() => {
     if (!name) return undefined;
-    if (logoCache.has(name)) {
-      setLogo(logoCache.get(name));
+    if (detailsCache.has(name)) {
+      setDetails(detailsCache.get(name));
       return undefined;
     }
-    const cached = steamGridImageService.peek?.(name)?.logo;
-    if (cached) {
-      logoCache.set(name, cached);
-      setLogo(cached);
-      return undefined;
-    }
-    setLogo(undefined);
+    setDetails({});
     let active = true;
     // Only look up titles that stay on screen for a moment, not every slide
     // the carousel flicks past
     const timer = setTimeout(async () => {
-      const assets = await steamGridImageService.getFullAssets(name);
-      const url = steamGridImageService.pickUrl(assets, "logo");
-      logoCache.set(name, url);
-      if (active) setLogo(url);
+      const result = await lookUpDetails(name);
+      detailsCache.set(name, result);
+      if (active) setDetails(result);
     }, 900);
     return () => {
       active = false;
@@ -51,7 +60,7 @@ const useGameLogo = name => {
     };
   }, [name]);
 
-  return logo;
+  return details;
 };
 
 const formatUpdated = (value, locale) => {
@@ -63,8 +72,10 @@ const formatUpdated = (value, locale) => {
   }).format(date);
 };
 
-const HeroLogo = ({ name, title }) => {
-  const logo = useGameLogo(name);
+const HERO_TAG =
+  "inline-flex items-center gap-2 rounded-[6px] border border-foreground/15 bg-foreground/20 px-3 py-1.5 text-sm text-foreground/90 backdrop-blur-md";
+
+const HeroLogo = ({ logo, title }) => {
   const [failed, setFailed] = useState(null);
   if (logo && failed !== logo) {
     return (
@@ -94,8 +105,6 @@ const HomeHero = memo(
     locale,
     t,
     onSelectSlide,
-    onPrev,
-    onNext,
     onOpen,
     onDownload,
     onTogglePlayLater,
@@ -103,6 +112,7 @@ const HomeHero = memo(
     interactionHandlers,
   }) => {
     const game = games[currentSlide];
+    const { logo, summary } = useHeroDetails(game?.game);
     if (!game) return null;
     const title = sanitizeText(game.game || "");
     const updated = formatUpdated(game.latest_update, locale);
@@ -121,7 +131,7 @@ const HomeHero = memo(
         {...interactionHandlers}
       >
         <div
-          className="relative h-[clamp(560px,88vh,920px)] cursor-pointer overflow-hidden"
+          className="relative h-[clamp(560px,calc(100vh-16px),1080px)] cursor-pointer overflow-hidden"
           onClick={() => onOpen(game)}
         >
           {imageUrl ? (
@@ -145,7 +155,7 @@ const HomeHero = memo(
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-background via-background/70 to-transparent" />
 
           <div
-            className="absolute inset-0 flex items-end justify-between gap-8 pb-[clamp(48px,9vh,104px)]"
+            className="absolute inset-0 flex items-end justify-between gap-8 pb-[clamp(56px,12vh,120px)]"
             style={{
               paddingLeft: "calc(var(--app-rail-width, 0px) + clamp(24px, 4.5vw, 72px))",
               paddingRight: "clamp(24px, 4.5vw, 72px)",
@@ -166,70 +176,62 @@ const HomeHero = memo(
 
               {games.length > 1 && (
                 <div
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-1.5 px-1"
                   onClick={e => e.stopPropagation()}
                 >
-                  <button
-                    type="button"
-                    aria-label={t("common.back")}
-                    onClick={onPrev}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/50 text-muted-foreground backdrop-blur-md transition-colors hover:text-foreground"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex gap-1.5">
-                    {games.map((item, index) => (
-                      <button
-                        type="button"
-                        key={item.game || index}
-                        aria-label={sanitizeText(item.game || "")}
-                        aria-current={index === currentSlide ? "true" : undefined}
-                        onClick={() => onSelectSlide(index)}
-                        className={cn(
-                          "h-1.5 rounded-full transition-all duration-300",
-                          index === currentSlide
-                            ? "w-6 bg-primary"
-                            : "w-1.5 bg-foreground/25 hover:bg-foreground/50"
-                        )}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={t("common.next")}
-                    onClick={onNext}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/50 text-muted-foreground backdrop-blur-md transition-colors hover:text-foreground"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  {games.map((item, index) => (
+                    <button
+                      type="button"
+                      key={item.game || index}
+                      aria-label={sanitizeText(item.game || "")}
+                      aria-current={index === currentSlide ? "true" : undefined}
+                      onClick={() => onSelectSlide(index)}
+                      className={cn(
+                        "h-1 rounded-full transition-all duration-300",
+                        index === currentSlide
+                          ? "w-6 bg-foreground/90"
+                          : "w-1.5 bg-foreground/25 hover:bg-foreground/50"
+                      )}
+                    />
+                  ))}
                 </div>
               )}
             </div>
 
             {/* Title block */}
             <div className="flex min-w-0 max-w-[560px] flex-col items-end gap-5 text-right">
-              <span className="inline-flex items-center gap-2 rounded-md border border-foreground/15 bg-foreground/10 px-3 py-1.5 text-sm text-foreground/90 backdrop-blur-md">
-                <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-                {t("home.hero.badge")}
-              </span>
-
-              <HeroLogo name={game.game} title={title} />
-
-              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-[15px] leading-relaxed text-foreground/70">
-                {categories.length > 0 && <span>{categories.join("  ·  ")}</span>}
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 {game.online && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-2 py-0.5 text-xs text-foreground/80">
-                    <Globe className="h-3.5 w-3.5" />
+                  <span className={HERO_TAG}>
+                    <Globe className="h-4 w-4" strokeWidth={1.75} />
                     {t("gameCard.online")}
                   </span>
                 )}
                 {game.dlc && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-2 py-0.5 text-xs text-foreground/80">
-                    <Gift className="h-3.5 w-3.5" />
+                  <span className={HERO_TAG}>
+                    <Gift className="h-4 w-4" strokeWidth={1.75} />
                     {t("gameCard.dlc")}
                   </span>
                 )}
+                <span className={HERO_TAG}>
+                  <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+                  {t("home.hero.badge")}
+                </span>
               </div>
+
+              <HeroLogo logo={logo} title={title} />
+
+              {summary ? (
+                <p className="m-0 line-clamp-3 max-w-[520px] text-sm leading-[1.6] text-foreground/70">
+                  {summary}
+                </p>
+              ) : (
+                categories.length > 0 && (
+                  <p className="m-0 text-[15px] leading-relaxed text-foreground/75">
+                    {categories.join("  ·  ")}
+                  </p>
+                )
+              )}
 
               <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
                 <button
