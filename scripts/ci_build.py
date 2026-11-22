@@ -14,9 +14,7 @@ from build_support import ROOT, validate_native_binary
 
 # Filename patterns each target must produce exactly one of. Windows ships the
 # installer and a portable build side by side, so they are told apart by name.
-TARGETS = {'windows-x64': ('win', ['* Setup *.exe', 'Ascendara-Portable-*.exe']),
-           'linux-x64': ('linux', ['*.AppImage']),
-           'mac-arm64': ('mac', ['*.dmg', '*.zip']), 'mac-x64': ('mac', ['*.dmg', '*.zip'])}
+TARGETS = {'windows-x64': ('win', ['* Setup *.exe', 'Ascendara-Portable-*.exe'])}
 # Everything here ships readable inside the app, so only values that are meant
 # to be public belong in it. The old AUTHORIZATION, ASCENDARA_API_KEY and
 # IMAGE_KEY entries were unused by the app and leaked server keys.

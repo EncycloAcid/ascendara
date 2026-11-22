@@ -70,15 +70,6 @@ jobs:
           - target: windows-x64
             runner: windows-latest
             script: dist
-          - target: linux-x64
-            runner: ubuntu-22.04
-            script: dist-linux
-          - target: mac-arm64
-            runner: macos-15
-            script: dist-mac-arm64
-          - target: mac-x64
-            runner: macos-15-intel
-            script: dist-mac-intel
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     env:
@@ -234,12 +225,8 @@ jobs:
           python-version: '3.12.10'
       - uses: actions/download-artifact@v4
         with:
-          pattern: '*-x64'
-          path: release-artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          name: mac-arm64
-          path: release-artifacts/mac-arm64
+          name: windows-x64
+          path: release-artifacts/windows-x64
       - run: python scripts/ci_build.py verify
   release:
     needs: [prepare, verify]
@@ -257,12 +244,8 @@ jobs:
           python-version: '3.12.10'
       - uses: actions/download-artifact@v4
         with:
-          pattern: '*-x64'
-          path: release-artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          name: mac-arm64
-          path: release-artifacts/mac-arm64
+          name: windows-x64
+          path: release-artifacts/windows-x64
       - name: Create draft, upload, register, and optionally publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -282,12 +265,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: '*-x64'
-          path: release-artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          name: mac-arm64
-          path: release-artifacts/mac-arm64
+          name: windows-x64
+          path: release-artifacts/windows-x64
       - name: Replace the testing prerelease
         env:
           GH_TOKEN: ${{ github.token }}
