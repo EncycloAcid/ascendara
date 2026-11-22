@@ -16,8 +16,8 @@ body {
   /* Text outside themed containers (like the menu bar) still follows the theme */
   color: rgb(var(--color-foreground));
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-    "Open Sans", "Helvetica Neue", sans-serif;
+    "Space Grotesk Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -814,7 +814,7 @@ html[data-effects="reduced"] *::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
-/* Without blur the translucent dock would show page text through it */
+/* Without blur the translucent rail would show page content through it */
 html[data-effects="reduced"] [data-boot-dock] {
   background-color: rgb(var(--color-nav-background, var(--color-background)) / 0.97) !important;
 }
@@ -904,13 +904,13 @@ html[data-effects="reduced"] *:not(.animate-spin)::after {
   --boot-i: 4;
 }
 
-/* The dock slides up from below the window edge alongside the menu bar */
+/* The navigation rail slides in from the window edge alongside the menu bar */
 .splash-active [data-boot-dock] {
-  translate: 0 calc(100% + 3rem);
+  translate: calc(-100% - 1rem) 0;
 }
 @keyframes boot-dock-in {
   from {
-    translate: 0 calc(100% + 3rem);
+    translate: calc(-100% - 1rem) 0;
   }
   to {
     translate: none;

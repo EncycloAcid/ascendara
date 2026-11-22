@@ -897,7 +897,7 @@ const Ascend = () => {
 
     return (
       <>
-        <div className="fixed inset-0 flex flex-col bg-background">
+        <div className="fixed inset-0 left-[var(--app-rail-width,0px)] flex flex-col bg-background">
           <AscendNavBar
             activeSection={activeSection}
             onSectionChange={setActiveSection}

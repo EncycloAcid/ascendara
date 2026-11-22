@@ -1,13 +1,12 @@
 import { useState, useEffect, memo, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import RecentGameCard from "@/components/RecentGameCard";
 import GameContextMenu from "@/components/GameContextMenu";
-import SteamNotRunningDialog from "@/components/SteamNotRunningDialog";
+import HomeHero from "@/components/home/HomeHero";
+import PopularShelf from "@/components/home/PopularShelf";
+import WeeklyStats from "@/components/home/WeeklyStats";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
 import { filterMatureGames } from "@/lib/matureContent";
@@ -22,27 +21,16 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import {
-  Flame,
-  Globe,
-  ChevronLeft,
-  ChevronRight,
-  Zap,
-  Play,
   Sparkles,
-  TrendingUp,
   Gamepad2,
-  RefreshCw,
   ArrowRight,
-  Gift,
   ExternalLink,
   HandCoins,
-  BanknoteIcon,
   Search,
   Library,
   Download,
   MessageSquare,
   HelpCircle,
-  Share2,
 } from "lucide-react";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import gameService from "@/services/games/gameService";
@@ -50,10 +38,8 @@ import imageCacheService from "@/services/images/imageCacheService";
 import { holdLoad, releaseWhenDecoded } from "@/lib/loadGate";
 import { orderedSources } from "@/lib/combinedSources";
 import steamGridImageService from "@/services/images/steamGridImageService";
-import recentGamesService from "@/services/library/recentGamesService";
-import { pullCloudGameDataBeforeLaunch } from "@/services/cloud/gameLaunchCloudSync";
-import { toast } from "sonner";
-import { cn, imageDataUrlFromBase64, sanitizeText } from "@/lib/utils";
+import { recordLibrarySnapshot } from "@/services/library/weeklyActivityService";
+import { cn, sanitizeText } from "@/lib/utils";
 
 // Module-level caches that persist during runtime
 let gamesCache = null;
@@ -66,9 +52,7 @@ let gamesCacheRevision = -1;
 // Everything else Home derives, so returning to Home paints the finished page
 // on the first frame instead of a skeleton that fills in mid-transition.
 let installedGamesCache = null;
-let recentGamesCache = null;
 let sectionsCache = null; // { source: apiGames array, sections }
-const recentCardImageCache = new Map(); // game name -> image data URL
 
 const hasWarmCache = () => !!(gamesCache && carouselGamesCache);
 // Rebuilt from the live image caches rather than remembered: the cached blob
@@ -142,84 +126,6 @@ const GameCoverFallback = memo(({ game, size = "md" }) => {
 });
 GameCoverFallback.displayName = "GameCoverFallback";
 
-// Compact Game Card for horizontal scrolling sections
-const CompactGameCard = memo(({ game, onClick, onContextMenu }) => {
-  const cardRef = useRef(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setIsVisible(true);
-      },
-      { rootMargin: "200px", threshold: 0.1 }
-    );
-    if (cardRef.current) observer.observe(cardRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  const { cachedImage: imageUrl, loading } = useImageLoader(game?.imgID, {
-    quality: isVisible ? "high" : "low",
-    priority: isVisible ? "high" : "low",
-    enabled: !!game?.imgID || (!game?.imgID && !!game?.game),
-    fallbackGameName: !game?.imgID ? game?.game : null,
-    fallbackSlot: "card",
-  });
-
-  const resolved = !loading;
-
-  return (
-    <div
-      ref={cardRef}
-      className="group relative flex-shrink-0 cursor-pointer"
-      style={{ width: "280px" }}
-      onClick={onClick}
-      onContextMenu={e => {
-        e.preventDefault();
-        e.stopPropagation();
-        onContextMenu?.(e, game);
-      }}
-    >
-      <div className="relative overflow-hidden rounded-xl bg-card shadow transition-all duration-300 hover:shadow-xl hover:shadow-primary/5">
-        <AspectRatio ratio={16 / 9}>
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={game.game}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-            />
-          ) : !resolved ? (
-            <Skeleton className="h-full w-full" />
-          ) : (
-            <GameCoverFallback game={game} />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-100" />
-        </AspectRatio>
-
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <div className="mb-1 flex items-center gap-1.5">
-            {game.online && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/80">
-                <Globe className="h-3 w-3 text-white" />
-              </span>
-            )}
-            {game.dlc && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/80">
-                <Gift className="h-3 w-3 text-white" />
-              </span>
-            )}
-          </div>
-          <h3 className="line-clamp-1 text-sm font-semibold text-white">
-            {sanitizeText(game.game)}
-          </h3>
-        </div>
-
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-      </div>
-    </div>
-  );
-});
-
 // Mini Game Card for category grids
 const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
   const cardRef = useRef(null);
@@ -285,283 +191,6 @@ const MiniGameCard = memo(({ game, onClick, onContextMenu }) => {
   );
 });
 
-// Mini Recent Card for hero sidebar - compact version
-const MiniRecentCard = memo(({ game, onPlay }) => {
-  const [imageData, setImageData] = useState(
-    () => recentCardImageCache.get(game.game || game.name) || null
-  );
-  const [, setTick] = useState(0);
-  const sanitizedGameName = sanitizeText(game.game || game.name);
-  const imageLoadedRef = useRef(recentCardImageCache.has(game.game || game.name));
-  const { cachedImage: fallbackImage, loading: fallbackLoading } = useImageLoader(
-    game.imgID,
-    {
-      quality: "high",
-      priority: "high",
-      enabled:
-        (!game.isCustom && !!game.imgID) || (!game.imgID && !!(game.game || game.name)),
-      fallbackGameName: game.imgID ? null : game.game || game.name,
-      fallbackSlot: "card",
-    }
-  );
-  const displayImage = imageData || fallbackImage;
-
-  useEffect(() => {
-    let isMounted = true;
-    const gameId = game.game || game.name;
-
-    const loadImage = async () => {
-      const releaseLoad = holdLoad();
-      // No localStorage caching - data URLs blow out the per-origin localStorage
-      // quota; IPC reads from disk are fast and React state holds the result.
-      try {
-        const imageBase64 = await window.electron.getGameImage(gameId);
-        if (imageBase64 && isMounted) {
-          const dataUrl = imageDataUrlFromBase64(imageBase64);
-          recentCardImageCache.set(gameId, dataUrl);
-          imageLoadedRef.current = true;
-          setImageData(dataUrl);
-          releaseWhenDecoded(releaseLoad, dataUrl);
-          return;
-        }
-      } catch (error) {}
-      releaseLoad();
-    };
-
-    if (!imageLoadedRef.current) {
-      loadImage();
-    }
-
-    // The cover/assets may not be downloaded to disk yet when this card first
-    // mounts (e.g. right after launching the game from Big Picture mode, where
-    // asset downloads happen in the background). Reload once they finish.
-    const handleCoverUpdate = event => {
-      const { gameName, dataUrl } = event.detail || {};
-      if (gameName === gameId && dataUrl && isMounted) {
-        recentCardImageCache.set(gameId, dataUrl);
-        imageLoadedRef.current = true;
-        setImageData(dataUrl);
-      }
-    };
-    window.addEventListener("game-cover-updated", handleCoverUpdate);
-
-    const unsubscribeAssetsUpdated = window.electron.onGameAssetsUpdated(
-      ({ game: updatedGame, success }) => {
-        if (updatedGame === gameId && success && isMounted) {
-          loadImage();
-        }
-      }
-    );
-
-    return () => {
-      isMounted = false;
-      window.removeEventListener("game-cover-updated", handleCoverUpdate);
-      unsubscribeAssetsUpdated();
-    };
-  }, [game.game, game.name]);
-
-  // Update time display every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTick(t => t + 1);
-    }, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, []);
-
-  const getTimeSinceLastPlayed = () => {
-    const lastPlayed = new Date(game.lastPlayed);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now - lastPlayed) / (1000 * 60));
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    return diffInDays === 1 ? "Yesterday" : `${diffInDays}d ago`;
-  };
-
-  return (
-    <div
-      className="group relative min-h-0 flex-1 cursor-pointer overflow-hidden rounded-lg"
-      onClick={() => onPlay(game)}
-    >
-      {displayImage ? (
-        <img
-          src={displayImage}
-          alt={sanitizedGameName}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-        />
-      ) : fallbackLoading ? (
-        <Skeleton className="absolute inset-0 h-full w-full" />
-      ) : (
-        <div className="absolute inset-0">
-          <GameCoverFallback game={game} size="xs" />
-        </div>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-70 transition-opacity group-hover:opacity-100" />
-      <div className="absolute bottom-0 left-0 right-0 p-2">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-md line-clamp-1 font-semibold text-white">
-              {sanitizedGameName}
-            </h3>
-            <p className="text-[12px] text-white/70">{getTimeSinceLastPlayed()}</p>
-          </div>
-          <div className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-white opacity-0 transition-all group-hover:scale-110 group-hover:bg-primary group-hover:opacity-100">
-            <Play className="h-2.5 w-2.5" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
-
-// Horizontal Scroll Section Component with lazy loading
-const INITIAL_LOAD_COUNT = 12;
-const LOAD_MORE_COUNT = 12;
-
-const HorizontalSection = ({
-  title,
-  icon: Icon,
-  games,
-  onGameClick,
-  onContextMenu,
-  accentColor = "primary",
-}) => {
-  const scrollRef = useRef(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-  const [loadedCount, setLoadedCount] = useState(INITIAL_LOAD_COUNT);
-
-  // Reset loaded count when games change
-  useEffect(() => {
-    setLoadedCount(INITIAL_LOAD_COUNT);
-  }, [games]);
-
-  const visibleGames = games?.slice(0, loadedCount) || [];
-  const hasMoreGames = games?.length > loadedCount;
-
-  const checkScroll = useCallback(() => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      // Can scroll right if there's more content OR more games to load
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10 || hasMoreGames);
-    }
-  }, [hasMoreGames]);
-
-  const loadMore = useCallback(() => {
-    if (hasMoreGames) {
-      setLoadedCount(prev => Math.min(prev + LOAD_MORE_COUNT, games.length));
-    }
-  }, [hasMoreGames, games?.length]);
-
-  const scroll = useCallback(
-    direction => {
-      if (scrollRef.current) {
-        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-        const scrollAmount = 600;
-
-        if (direction === "right") {
-          // Check if we're near the end and need to load more
-          const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 100;
-          if (isNearEnd && hasMoreGames) {
-            loadMore();
-          }
-          scrollRef.current.scrollBy({
-            left: scrollAmount,
-            behavior: "smooth",
-          });
-        } else {
-          scrollRef.current.scrollBy({
-            left: -scrollAmount,
-            behavior: "smooth",
-          });
-        }
-      }
-    },
-    [hasMoreGames, loadMore]
-  );
-
-  useEffect(() => {
-    checkScroll();
-    const ref = scrollRef.current;
-    if (ref) {
-      ref.addEventListener("scroll", checkScroll);
-      return () => ref.removeEventListener("scroll", checkScroll);
-    }
-  }, [visibleGames, checkScroll]);
-
-  if (!games?.length) return null;
-
-  return (
-    <div className="relative">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "mb-2 flex h-9 w-9 items-center justify-center rounded-lg",
-              `bg-${accentColor}/10`
-            )}
-            style={{ backgroundColor: `rgb(var(--color-${accentColor}) / 0.1)` }}
-          >
-            <Icon className="h-4 w-4 text-primary" />
-          </div>
-          <h2 className="text-lg font-bold text-foreground">{title}</h2>
-          <span className="mb-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-            {visibleGames.length}
-            {hasMoreGames ? "+" : ""}
-          </span>
-        </div>
-
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-8 w-8 rounded-full",
-              !canScrollLeft && "cursor-not-allowed opacity-30"
-            )}
-            onClick={() => scroll("left")}
-            disabled={!canScrollLeft}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-8 w-8 rounded-full",
-              !canScrollRight && "cursor-not-allowed opacity-30"
-            )}
-            onClick={() => scroll("right")}
-            disabled={!canScrollRight}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Scrollable Content */}
-      <div
-        ref={scrollRef}
-        className="scrollbar-hide flex gap-4 overflow-x-auto pb-2"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        {visibleGames.map(game => (
-          <CompactGameCard
-            key={game.game}
-            game={game}
-            onClick={() => onGameClick(game)}
-            onContextMenu={onContextMenu}
-          />
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const Home = memo(() => {
   const navigate = useNavigate();
   const [allApiGames, setApiGames] = useState(() => gamesCache || []);
@@ -581,7 +210,7 @@ const Home = memo(() => {
   const [popularCategories, setPopularCategories] = useState(
     () => cachedSections()?.popularCategories || {}
   );
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { settings } = useSettings();
   // Mature games stay out of Home unless the setting allows them
   const showMature = Boolean(settings?.seeInappropriateContent);
@@ -598,14 +227,16 @@ const Home = memo(() => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [carouselImages, setCarouselImages] = useState(cachedCarouselImages);
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
-  const [recentGames, setRecentGames] = useState(() => recentGamesCache || []);
+  const [activityKey, setActivityKey] = useState(0);
+  // A drag across the hero flips the slide; the click that ends it must not
+  // also open the game
+  const suppressHeroClickRef = useRef(false);
 
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
-  const [featuredGame, setFeaturedGame] = useState(null);
   const [showQuickAccessDialog, setShowQuickAccessDialog] = useState(false);
   const [quickAccessPage, setQuickAccessPage] = useState(() => {
     return localStorage.getItem("homeQuickAccessPage") || "library";
@@ -616,7 +247,6 @@ const Home = memo(() => {
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextMenuGame, setContextMenuGame] = useState(null);
   const [playLaterGames, setPlayLaterGames] = useState([]);
-  const [showSteamNotRunningWarning, setShowSteamNotRunningWarning] = useState(false);
 
   // Load Play Later games
   useEffect(() => {
@@ -930,22 +560,12 @@ const Home = memo(() => {
     };
   }, [carouselGames, imageRefreshKey]);
 
+  // Weekly stats read today's library totals, so record them before showing
   useEffect(() => {
-    const updateRecentGames = async () => {
-      const releaseLoad = holdLoad();
-      try {
-        const recent = await getRecentGames([...installedGames, ...apiGames]);
-        recentGamesCache = recent;
-        setRecentGames(recent);
-      } finally {
-        releaseLoad();
-      }
-    };
-    // Only update when games actually change, not on every render
-    if (installedGames.length > 0 || apiGames.length > 0) {
-      updateRecentGames();
-    }
-  }, [installedGames.length, apiGames]);
+    if (installedGames.length === 0) return;
+    recordLibrarySnapshot(installedGames);
+    setActivityKey(key => key + 1);
+  }, [installedGames]);
 
   useEffect(() => {
     // Only recalculate sections when apiGames actually changes
@@ -1117,98 +737,6 @@ const Home = memo(() => {
     return categories;
   };
 
-  const getRecentGames = async games => {
-    const recentlyPlayed = recentGamesService.getRecentGames();
-
-    try {
-      // Get actually installed games from electron
-      const installedGames = await window.electron.getGames();
-      const customGames = await window.electron.getCustomGames();
-
-      // Combine installed and custom games
-      const actuallyInstalledGames = [
-        ...(installedGames || []).map(game => ({
-          ...game,
-          isCustom: false,
-        })),
-        ...(customGames || []).map(game => ({
-          name: game.game,
-          game: game.game,
-          version: game.version,
-          online: game.online,
-          dlc: game.dlc,
-          executable: game.executable,
-          isCustom: true,
-        })),
-      ];
-
-      // Filter out games that are no longer installed and merge with full game details
-      return recentlyPlayed
-        .filter(recentGame =>
-          actuallyInstalledGames.some(g => g.game === recentGame.game)
-        )
-        .map(recentGame => {
-          const gameDetails =
-            games.find(g => g.game === recentGame.game) ||
-            actuallyInstalledGames.find(g => g.game === recentGame.game);
-          return {
-            ...gameDetails,
-            lastPlayed: recentGame.lastPlayed,
-          };
-        });
-    } catch (error) {
-      console.error("Error getting installed games:", error);
-      return [];
-    }
-  };
-
-  const handlePlayGame = async game => {
-    try {
-      const gameName = game.game || game.name;
-
-      // Check if game is already running
-      if (await window.electron.isGameRunning(gameName)) {
-        toast.error(t("library.alreadyRunning", { game: gameName }));
-        return;
-      }
-
-      // Check if Steam is running for onlinefix games
-      if (game.online && (await window.electron.isOnWindows())) {
-        const hideSteamWarning = localStorage.getItem("hideSteamWarning");
-        if (!hideSteamWarning) {
-          if (!(await window.electron.isSteamRunning())) {
-            toast.error(t("library.steamNotRunning"));
-            setShowSteamNotRunningWarning(true);
-            return;
-          }
-        }
-      }
-
-      // Cloud-first pre-launch merge (silent / best-effort).
-      await pullCloudGameDataBeforeLaunch(gameName);
-      await window.electron.playGame(gameName, game.isCustom);
-
-      // Get and cache the game image
-      const imageBase64 = await window.electron.getGameImage(game.game || game.name);
-      if (imageBase64) {
-        await imageCacheService.getImage(game.imgID);
-      }
-
-      // Update recently played
-      recentGamesService.addRecentGame({
-        game: game.game || game.name,
-        name: game.name,
-        imgID: game.imgID,
-        version: game.version,
-        isCustom: game.isCustom,
-        online: game.online,
-        dlc: game.dlc,
-      });
-    } catch (error) {
-      console.error("Error playing game:", error);
-    }
-  };
-
   const handlePrevSlide = useCallback(() => {
     setCurrentSlide(prev => (prev === 0 ? carouselGames.length - 1 : prev - 1));
     setAutoPlay(false);
@@ -1258,6 +786,7 @@ const Home = memo(() => {
   const handleTouchEnd = useCallback(() => {
     setIsDragging(false);
     const diff = touchStart - touchEnd;
+    if (Math.abs(diff) > 8) suppressHeroClickRef.current = true;
     const threshold = window.innerWidth * 0.2; // 20% of screen width
 
     if (Math.abs(diff) > threshold) {
@@ -1292,6 +821,7 @@ const Home = memo(() => {
       if (!isDragging) return;
       setIsDragging(false);
       const diff = dragStart - e.clientX;
+      if (Math.abs(diff) > 8) suppressHeroClickRef.current = true;
       const threshold = window.innerWidth * 0.2;
 
       if (Math.abs(diff) > threshold) {
@@ -1316,38 +846,61 @@ const Home = memo(() => {
     [isDragging, handleMouseUp]
   );
 
+  const isPlayLater = useCallback(
+    game => !!game && playLaterGames.some(g => g.game === game.game),
+    [playLaterGames]
+  );
+
+  const openHeroGame = useCallback(
+    game => {
+      if (suppressHeroClickRef.current) {
+        suppressHeroClickRef.current = false;
+        return;
+      }
+      handleCarouselGameClick(game);
+    },
+    [handleCarouselGameClick]
+  );
+
+  const renderCoverFallback = useCallback(game => <GameCoverFallback game={game} />, []);
+
+  const openSearch = () => {
+    navigate("/search");
+    setTimeout(() => {
+      const searchInput = document.querySelector('input[placeholder*="Search"]');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.click();
+      }
+    }, 150);
+  };
+
   // Loading State
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="px-6 py-6">
-          {/* Hero Skeleton */}
-          <div className="mb-8 grid gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <Skeleton className="aspect-[16/9] w-full rounded-2xl" />
-            </div>
-            <div className="hidden space-y-4 lg:block">
-              <Skeleton className="aspect-video w-full rounded-xl" />
-              <Skeleton className="aspect-video w-full rounded-xl" />
-            </div>
+        <div
+          style={{
+            marginLeft: "calc(-1 * (var(--app-rail-width, 0px) + 1rem))",
+            marginRight: "-1rem",
+          }}
+        >
+          <Skeleton className="h-[clamp(560px,88vh,920px)] w-full rounded-none" />
+        </div>
+        <div className="space-y-5 px-[clamp(8px,2.5vw,40px)]">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-7 w-32" />
+            <Skeleton className="h-11 w-72 rounded-[10px]" />
           </div>
-
-          {/* Horizontal Section Skeletons */}
-          {[1, 2, 3].map(i => (
-            <div key={i} className="mb-8">
-              <div className="mb-4 flex items-center gap-3">
-                <Skeleton className="h-9 w-9 rounded-lg" />
-                <Skeleton className="h-5 w-32" />
-              </div>
-              <div className="flex gap-4">
-                {Array(5)
-                  .fill(0)
-                  .map((_, j) => (
-                    <Skeleton key={j} className="h-40 w-72 flex-shrink-0 rounded-xl" />
-                  ))}
-              </div>
-            </div>
-          ))}
+          <div className="flex h-[clamp(300px,40vh,420px)] gap-4 overflow-hidden">
+            <Skeleton className="aspect-[565/400] h-full shrink-0 rounded-[10px]" />
+            {[0, 1, 2, 3].map(i => (
+              <Skeleton
+                key={i}
+                className="aspect-[263/400] h-full shrink-0 rounded-[10px]"
+              />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -1358,6 +911,25 @@ const Home = memo(() => {
 
   // If no carousel games, show a simpler layout
   const hasCarousel = carouselGames.length > 0 && currentGame;
+  const heroKey = carouselCoverKey(currentGame);
+  const heroUrl = heroKey ? carouselImages[heroKey] : null;
+  // Still resolving (either imgID fetch or SteamGrid lookup)
+  const heroLoading =
+    !heroUrl &&
+    !!(
+      currentGame?.imgID ||
+      (currentGame?.game && !steamGridImageService.peek(currentGame.game))
+    );
+
+  const shelfTabs = [
+    { id: "top", label: t("home.tabs.top"), games: topGames },
+    { id: "updated", label: t("home.tabs.updated"), games: recentlyUpdatedGames },
+    { id: "online", label: t("home.tabs.online"), games: onlineGames },
+    { id: "action", label: t("home.tabs.action"), games: actionGames },
+  ];
+
+  const quickAccessTile =
+    "flex h-16 w-[88px] flex-col items-center justify-center gap-1.5 rounded-[12px] border border-border/70 bg-card text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground";
 
   return (
     <div className="min-h-screen bg-background">
@@ -1370,357 +942,170 @@ const Home = memo(() => {
         onStartDownload={handleStartDownload}
         onReadMore={handleReadMore}
         onPlayLater={handlePlayLaterFromContext}
-        isPlayLater={
-          contextMenuGame && playLaterGames.some(g => g.game === contextMenuGame.game)
-        }
+        isPlayLater={isPlayLater(contextMenuGame)}
       />
 
-      <SteamNotRunningDialog
-        open={showSteamNotRunningWarning}
-        onClose={() => setShowSteamNotRunningWarning(false)}
-        t={t}
-      />
+      {hasCarousel && (
+        <HomeHero
+          games={carouselGames}
+          currentSlide={currentSlide}
+          imageUrl={heroUrl}
+          imageLoading={heroLoading}
+          fallback={<GameCoverFallback game={currentGame} />}
+          locale={language}
+          t={t}
+          onSelectSlide={index => {
+            setCurrentSlide(index);
+            setAutoPlay(false);
+          }}
+          onPrev={handlePrevSlide}
+          onNext={handleNextSlide}
+          onOpen={openHeroGame}
+          onDownload={handleStartDownload}
+          onTogglePlayLater={handlePlayLaterFromContext}
+          isPlayLater={isPlayLater}
+          interactionHandlers={{
+            onMouseDown: handleMouseDown,
+            onMouseMove: handleMouseMove,
+            onMouseUp: handleMouseUp,
+            onMouseLeave: handleMouseLeave,
+            onTouchStart: handleTouchStart,
+            onTouchMove: handleTouchMove,
+            onTouchEnd: handleTouchEnd,
+          }}
+        />
+      )}
 
-      <div className="px-6 py-6">
-        {/* Hero Section - Split Layout */}
-        {hasCarousel && (
-          <section className="mb-10">
-            <div className="grid gap-4 lg:grid-cols-3">
-              {/* Main Featured Game */}
-              <div
-                data-tour="home-featured"
-                className="group relative lg:col-span-2"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div
-                  className="relative cursor-pointer overflow-hidden rounded-2xl"
-                  onClick={() =>
-                    !isDragging && currentGame && handleCarouselGameClick(currentGame)
-                  }
-                >
-                  <AspectRatio ratio={16 / 9}>
-                    {(() => {
-                      const heroKey = carouselCoverKey(currentGame);
-                      const heroUrl = heroKey ? carouselImages[heroKey] : null;
-                      if (heroUrl) {
-                        return (
-                          <img
-                            src={heroUrl}
-                            alt={currentGame?.game}
-                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                            draggable="false"
-                          />
-                        );
-                      }
-                      // Still resolving (either imgID fetch or SteamGrid lookup)
-                      if (
-                        currentGame?.imgID ||
-                        (currentGame?.game &&
-                          !steamGridImageService.peek(currentGame.game))
-                      ) {
-                        return <Skeleton className="h-full w-full" />;
-                      }
-                      return <GameCoverFallback game={currentGame} />;
-                    })()}
-                  </AspectRatio>
-
-                  {/* Overlays */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
-
-                  {/* Content */}
-                  <div className="absolute inset-0 flex flex-col justify-end p-6 lg:p-8">
-                    <div className="max-w-xl space-y-4">
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-2">
-                        {currentGame?.online && (
-                          <Badge
-                            variant="outline"
-                            className="border-white/30 bg-white/10 text-white backdrop-blur-sm"
-                          >
-                            <Globe className="mr-1 h-3 w-3" />
-                            Online
-                          </Badge>
-                        )}
-                        {currentGame?.dlc && (
-                          <Badge
-                            variant="outline"
-                            className="border-white/30 bg-white/10 text-white backdrop-blur-sm"
-                          >
-                            <Gift className="mr-1 h-3 w-3" />
-                            All DLC
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Title */}
-                      <h1 className="text-3xl font-bold text-white lg:text-4xl xl:text-5xl">
-                        {sanitizeText(currentGame?.game || "")}
-                      </h1>
-
-                      {/* Categories */}
-                      <div className="flex flex-wrap gap-2">
-                        {currentGame?.category?.slice(0, 4).map((cat, idx) => (
-                          <span
-                            key={cat + idx}
-                            className="rounded-full bg-white/10 px-3 py-1 text-sm text-white/80 backdrop-blur-sm"
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* CTA */}
-                      <Button
-                        size="lg"
-                        className="mt-2 gap-2 bg-primary text-white shadow-xl hover:bg-primary/60"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleCarouselGameClick(currentGame);
-                        }}
-                      >
-                        {t("home.viewGame") || "View Game"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Slide Navigation */}
-                  <div className="absolute bottom-6 right-6 flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
-                      onClick={e => {
-                        e.stopPropagation();
-                        handlePrevSlide();
-                      }}
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <div className="flex gap-1.5 px-2">
-                      {carouselGames.map((_, index) => (
-                        <button
-                          key={index}
-                          className={cn(
-                            "h-1.5 rounded-full transition-all",
-                            index === currentSlide
-                              ? "w-6 bg-primary"
-                              : "w-1.5 bg-white/40 hover:bg-white/60"
-                          )}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setCurrentSlide(index);
-                            setAutoPlay(false);
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleNextSlide();
-                      }}
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Side Cards - Recently Played */}
-              <div
-                data-tour="home-recent"
-                className="hidden flex-col lg:flex"
-                style={{ height: "calc(100% - 0px)" }}
-              >
-                <div className="mb-1 flex items-center gap-2 text-lg font-medium text-muted-foreground">
-                  <Play className="h-3 w-3 text-primary" />
-                  {t("home.recentGames")}
-                </div>
-                {recentGames.length > 0 ? (
-                  <div className="flex flex-1 flex-col gap-1.5">
-                    {recentGames.slice(0, 3).map((game, index) => (
-                      <MiniRecentCard
-                        key={`recent-hero-${game.game}-${index}`}
-                        game={game}
-                        onPlay={handlePlayGame}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border/50 bg-card/50 p-3 text-center">
-                    <Play className="mb-2 h-6 w-6 text-muted-foreground/40" />
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {t("home.noRecentGames")}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground/70">
-                      {t("home.noRecentGamesHint")}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
+      <div
+        className={cn(
+          "relative space-y-16 px-[clamp(8px,2.5vw,40px)]",
+          hasCarousel ? "-mt-4" : "pt-6"
         )}
+      >
+        <PopularShelf
+          title={t("home.popular")}
+          tabs={shelfTabs}
+          locale={language}
+          t={t}
+          isPlayLater={isPlayLater}
+          fallback={renderCoverFallback}
+          onOpen={handleCarouselGameClick}
+          onDownload={handleStartDownload}
+          onTogglePlayLater={handlePlayLaterFromContext}
+          onContextMenu={handleContextMenu}
+        />
+
+        <WeeklyStats t={t} locale={language} refreshKey={activityKey} />
 
         {/* Search Bar with Quick Access Buttons */}
         {settings.homeSearch && (
-          <section className="mt-10">
-            <div className="flex items-center gap-4">
-              {/* Left Divider */}
-              <div className="hidden flex-1 lg:block">
-                <div className="h-px bg-gradient-to-r from-transparent via-border to-border"></div>
+          <section className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={openSearch}
+              data-tour="home-search"
+              className="group flex h-16 flex-1 items-center gap-4 rounded-[12px] border border-border/70 bg-card px-4 text-left transition-colors hover:border-foreground/25"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-muted text-muted-foreground transition-colors group-hover:text-foreground">
+                <Search className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] text-foreground/85">
+                  {t("home.searchPlaceholder")}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground/70">
+                  {t("home.searchSubtitle")}
+                </span>
+              </span>
+            </button>
+
+            {/* Quick Access Buttons */}
+            <div data-tour="home-links" className="flex gap-3">
+              {/* Customizable Quick Access Button: click to open, hold to choose */}
+              <div
+                data-tour="home-quick-access"
+                role="button"
+                tabIndex={0}
+                className={cn(quickAccessTile, "cursor-pointer")}
+                onKeyDown={event => {
+                  if (event.key === "Enter") navigate(`/${quickAccessPage}`);
+                }}
+                onMouseDown={() => {
+                  setIsLongPressing(false);
+                  longPressTimer.current = setTimeout(() => {
+                    setIsLongPressing(true);
+                    setShowQuickAccessDialog(true);
+                  }, 500);
+                }}
+                onMouseUp={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                  }
+                  if (!isLongPressing) {
+                    navigate(`/${quickAccessPage}`);
+                  }
+                  setIsLongPressing(false);
+                }}
+                onMouseLeave={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                  }
+                  setIsLongPressing(false);
+                }}
+                onTouchStart={() => {
+                  setIsLongPressing(false);
+                  longPressTimer.current = setTimeout(() => {
+                    setIsLongPressing(true);
+                    setShowQuickAccessDialog(true);
+                  }, 500);
+                }}
+                onTouchEnd={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                  }
+                  if (!isLongPressing) {
+                    navigate(`/${quickAccessPage}`);
+                  }
+                  setIsLongPressing(false);
+                }}
+              >
+                {quickAccessPage === "library" && (
+                  <Library className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                )}
+                {quickAccessPage === "downloads" && (
+                  <Download className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                )}
+                {quickAccessPage === "bigpicture" && (
+                  <Gamepad2 className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                )}
+                {quickAccessPage === "ascend" && (
+                  <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                )}
+                <span className="max-w-full truncate px-1">
+                  {quickAccessPage === "library" && t("common.library")}
+                  {quickAccessPage === "downloads" && t("common.downloads")}
+                  {quickAccessPage === "bigpicture" && t("common.bigpicture")}
+                  {quickAccessPage === "ascend" && t("common.ascend")}
+                </span>
               </div>
 
-              {/* Search Bar Container */}
-              <div className="mx-auto flex w-full items-center gap-3 lg:w-auto lg:flex-none">
-                {/* Main Search Bar */}
-                <div
-                  onClick={() => {
-                    navigate("/search");
-                    setTimeout(() => {
-                      const searchInput = document.querySelector(
-                        'input[placeholder*="Search"]'
-                      );
-                      if (searchInput) {
-                        searchInput.focus();
-                        searchInput.click();
-                      }
-                    }, 150);
-                  }}
-                  data-tour="home-search"
-                  className="group flex-1 cursor-text lg:w-[600px] lg:flex-none"
-                >
-                  <div className="relative flex items-center gap-3 rounded-2xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 px-5 py-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
-                      <Search className="h-5 w-5 text-primary transition-all duration-300 group-hover:scale-110" />
-                    </div>
-                    <div className="flex-1">
-                      <span className="text-base font-medium text-muted-foreground/80 transition-colors group-hover:text-foreground">
-                        {t("home.searchPlaceholder")}
-                      </span>
-                      <p className="mt-0.5 text-xs text-muted-foreground/60">
-                        {t("home.searchSubtitle")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <button
+                type="button"
+                className={quickAccessTile}
+                onClick={() => window.electron.openURL("https://ascendara.app/discord")}
+              >
+                <MessageSquare className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                {t("common.discord")}
+              </button>
 
-                {/* Quick Access Buttons */}
-                <div data-tour="home-links" className="flex gap-2">
-                  {/* Customizable Quick Access Button */}
-                  <div
-                    data-tour="home-quick-access"
-                    className="group cursor-pointer"
-                    onMouseDown={() => {
-                      setIsLongPressing(false);
-                      longPressTimer.current = setTimeout(() => {
-                        setIsLongPressing(true);
-                        setShowQuickAccessDialog(true);
-                      }, 500);
-                    }}
-                    onMouseUp={() => {
-                      if (longPressTimer.current) {
-                        clearTimeout(longPressTimer.current);
-                      }
-                      if (!isLongPressing) {
-                        navigate(`/${quickAccessPage}`);
-                      }
-                      setIsLongPressing(false);
-                    }}
-                    onMouseLeave={() => {
-                      if (longPressTimer.current) {
-                        clearTimeout(longPressTimer.current);
-                      }
-                      setIsLongPressing(false);
-                    }}
-                    onTouchStart={() => {
-                      setIsLongPressing(false);
-                      longPressTimer.current = setTimeout(() => {
-                        setIsLongPressing(true);
-                        setShowQuickAccessDialog(true);
-                      }, 500);
-                    }}
-                    onTouchEnd={() => {
-                      if (longPressTimer.current) {
-                        clearTimeout(longPressTimer.current);
-                      }
-                      if (!isLongPressing) {
-                        navigate(`/${quickAccessPage}`);
-                      }
-                      setIsLongPressing(false);
-                    }}
-                  >
-                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
-                        {quickAccessPage === "library" && (
-                          <Library className="h-4 w-4 text-primary" />
-                        )}
-                        {quickAccessPage === "downloads" && (
-                          <Download className="h-4 w-4 text-primary" />
-                        )}
-                        {quickAccessPage === "bigpicture" && (
-                          <Gamepad2 className="h-4 w-4 text-primary" />
-                        )}
-                        {quickAccessPage === "ascend" && (
-                          <Sparkles className="h-4 w-4 text-primary" />
-                        )}
-                      </div>
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        {quickAccessPage === "library" && t("common.library")}
-                        {quickAccessPage === "downloads" && t("common.downloads")}
-                        {quickAccessPage === "bigpicture" && t("common.bigpicture")}
-                        {quickAccessPage === "ascend" && t("common.ascend")}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Discord Button */}
-                  <div
-                    className="group cursor-pointer"
-                    onClick={() =>
-                      window.electron.openURL("https://ascendara.app/discord")
-                    }
-                  >
-                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
-                        <MessageSquare className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        {t("common.discord")}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div
-                    className="group cursor-pointer"
-                    onClick={() => window.electron.openURL("https://ascendara.app/docs")}
-                  >
-                    <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-border/40 bg-gradient-to-br from-card/80 to-card/40 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
-                        <HelpCircle className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        {t("common.help")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Divider */}
-              <div className="hidden flex-1 lg:block">
-                <div className="h-px bg-gradient-to-l from-transparent via-border to-border"></div>
-              </div>
+              <button
+                type="button"
+                className={quickAccessTile}
+                onClick={() => window.electron.openURL("https://ascendara.app/docs")}
+              >
+                <HelpCircle className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                {t("common.help")}
+              </button>
             </div>
           </section>
         )}
@@ -1750,46 +1135,26 @@ const Home = memo(() => {
                   }}
                   className="space-y-3"
                 >
-                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
-                    <RadioGroupItem value="library" id="library" />
-                    <Label
-                      htmlFor="library"
-                      className="flex flex-1 cursor-pointer items-center gap-2"
+                  {[
+                    ["library", Library, t("common.library")],
+                    ["downloads", Download, t("common.downloads")],
+                    ["bigpicture", Gamepad2, t("common.bigpicture")],
+                    ["ascend", Sparkles, t("common.ascend")],
+                  ].map(([value, Icon, label]) => (
+                    <div
+                      key={value}
+                      className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent"
                     >
-                      <Library className="h-4 w-4 text-primary" />
-                      <span>{t("common.library")}</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
-                    <RadioGroupItem value="downloads" id="downloads" />
-                    <Label
-                      htmlFor="downloads"
-                      className="flex flex-1 cursor-pointer items-center gap-2"
-                    >
-                      <Download className="h-4 w-4 text-primary" />
-                      <span>{t("common.downloads")}</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
-                    <RadioGroupItem value="bigpicture" id="bigpicture" />
-                    <Label
-                      htmlFor="bigpicture"
-                      className="flex flex-1 cursor-pointer items-center gap-2"
-                    >
-                      <Gamepad2 className="h-4 w-4 text-primary" />
-                      <span>{t("common.bigpicture")}</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent">
-                    <RadioGroupItem value="ascend" id="ascend" />
-                    <Label
-                      htmlFor="ascend"
-                      className="flex flex-1 cursor-pointer items-center gap-2"
-                    >
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <span>{t("common.ascend")}</span>
-                    </Label>
-                  </div>
+                      <RadioGroupItem value={value} id={value} />
+                      <Label
+                        htmlFor={value}
+                        className="flex flex-1 cursor-pointer items-center gap-2"
+                      >
+                        <Icon className="h-4 w-4 text-primary" />
+                        <span>{label}</span>
+                      </Label>
+                    </div>
+                  ))}
                 </RadioGroup>
               </div>
               <div className="mt-6 flex justify-end">
@@ -1799,151 +1164,55 @@ const Home = memo(() => {
           </AlertDialog>
         )}
 
-        {/* Recently Played - Mobile/Tablet (shows when sidebar is hidden) */}
-        {recentGames.length > 0 && (
-          <section className="mb-10 lg:hidden">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                <Play className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="text-lg font-bold text-foreground">
-                {t("home.recentGames")}
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {recentGames.slice(0, 4).map((game, index) => (
-                <RecentGameCard
-                  key={`recent-mobile-${game.game}-${index}`}
-                  game={game}
-                  onPlay={handlePlayGame}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Top Games - Horizontal Scroll */}
-        {topGames.length > 0 && (
-          <div data-tour="home-rows">
-            <HorizontalSection
-              title={t("home.topGames")}
-              icon={TrendingUp}
-              games={topGames}
-              onGameClick={handleCarouselGameClick}
-              onContextMenu={handleContextMenu}
-            />
-          </div>
-        )}
-
-        {/* Recently Updated - Horizontal Scroll */}
-        {recentlyUpdatedGames.length > 0 && (
-          <div className="mt-8">
-            <HorizontalSection
-              title={t("home.mostRecentlyUpdated")}
-              icon={RefreshCw}
-              games={recentlyUpdatedGames}
-              onGameClick={handleCarouselGameClick}
-              onContextMenu={handleContextMenu}
-            />
-          </div>
-        )}
-
-        {/* Online Games - Horizontal Scroll */}
-        {onlineGames.length > 0 && (
-          <div className="mt-8">
-            <HorizontalSection
-              title={t("home.onlineGames")}
-              icon={Globe}
-              games={onlineGames}
-              onGameClick={handleCarouselGameClick}
-              onContextMenu={handleContextMenu}
-            />
-          </div>
-        )}
-
-        {/* Action Games - Horizontal Scroll */}
-        {actionGames.length > 0 && (
-          <div className="mt-8">
-            <HorizontalSection
-              title={t("home.actionGames")}
-              icon={Zap}
-              games={actionGames}
-              onGameClick={handleCarouselGameClick}
-              onContextMenu={handleContextMenu}
-            />
-          </div>
-        )}
-
-        {/* Popular Categories - Grid of Cards */}
+        {/* Popular Categories */}
         {Object.keys(popularCategories).length > 0 && (
-          <section className="mt-10">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                <Flame className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="text-lg font-bold text-foreground">
-                {t("home.popularCategories")}
-              </h2>
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <section>
+            <h2 className="mb-5 mt-0 text-[1.375rem] font-semibold tracking-tight text-foreground">
+              {t("home.popularCategories")}
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Object.entries(popularCategories).map(([category, games]) => (
-                <Card
+                <div
                   key={category}
-                  className="group overflow-hidden border-border/50 bg-gradient-to-br from-card to-card/50 transition-all hover:border-primary/30 hover:shadow-xl"
+                  className="rounded-[16px] border border-border/70 bg-background p-2.5"
                 >
-                  <CardContent className="p-5">
-                    <div className="mb-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                          <Gamepad2 className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-foreground">{category}</h3>
-                          <p className="text-xs text-muted-foreground">
-                            {games.length} games
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {games.slice(0, 4).map(game => (
-                        <MiniGameCard
-                          key={game.game}
-                          game={game}
-                          onClick={() => handleCarouselGameClick(game)}
-                          onContextMenu={handleContextMenu}
-                        />
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="mb-2.5 flex items-center justify-between rounded-[10px] bg-card px-4 py-3">
+                    <h3 className="m-0 text-[15px] font-semibold text-foreground">
+                      {category}
+                    </h3>
+                    <span className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                      {games.length}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {games.slice(0, 4).map(game => (
+                      <MiniGameCard
+                        key={game.game}
+                        game={game}
+                        onClick={() => handleCarouselGameClick(game)}
+                        onContextMenu={handleContextMenu}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </section>
         )}
 
         {/* Footer - Support Section */}
-        <footer className="mt-16 border-t border-border/30 pb-8 pt-10">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="mb-6 flex justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
-                <Share2 className="h-7 w-7 text-primary" />
-              </div>
-            </div>
-
-            <h3 className="mb-3 text-xl font-bold text-foreground">
+        <footer className="border-t border-border/60 pb-8 pt-10">
+          <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+            <h3 className="mb-2 text-lg font-semibold text-foreground">
               {t("home.footer.title")}
             </h3>
-
             <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
               {t("home.footer.description")}
             </p>
-
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button
                 variant="outline"
-                className="gap-2"
+                className="gap-2 rounded-[10px]"
                 onClick={() => window.electron.openURL("https://ascendara.app/support")}
               >
                 <HandCoins className="h-4 w-4" />
@@ -1951,7 +1220,7 @@ const Home = memo(() => {
               </Button>
               <Button
                 variant="ghost"
-                className="gap-2 text-muted-foreground hover:text-foreground"
+                className="gap-2 rounded-[10px] text-muted-foreground hover:text-foreground"
                 onClick={() =>
                   window.electron.openURL("https://github.com/ascendara/ascendara")
                 }
@@ -1960,7 +1229,6 @@ const Home = memo(() => {
                 {t("home.footer.github")}
               </Button>
             </div>
-
             <p className="mt-8 text-xs text-muted-foreground/60">
               {t("home.footer.madeWith")}
             </p>

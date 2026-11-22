@@ -1791,7 +1791,7 @@ const Library = () => {
 
   return (
     <div
-      className="fixed inset-0 flex overflow-hidden bg-background"
+      className="fixed inset-0 left-[var(--app-rail-width,0px)] flex overflow-hidden bg-background"
       style={{ top: MENU_BAR_HEIGHT_PX }}
       // The wishlist only lists Steam games, so dropping a game there means nothing
       {...(activeTab !== "wishlist" && {
@@ -7255,7 +7255,7 @@ const ManualAddGameForm = ({ onSuccess, onRestorePrompt, initialExecutablePath }
                     <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
                       <div className="rounded-full bg-primary p-1">
                         <svg
-                          className="text-primary-foreground h-3 w-3"
+                          className="h-3 w-3 text-primary-foreground"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"

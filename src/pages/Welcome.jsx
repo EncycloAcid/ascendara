@@ -200,6 +200,7 @@ const themes = [
   { id: "royal-pearl", name: "Royal Pearl", group: "light", isNew: true },
 
   // Dark themes
+  { id: "onyx", name: "Onyx", group: "dark", isNew: true },
   { id: "aurora", name: "Aurora", group: "dark", isNew: true },
   { id: "midnight", name: "Midnight", group: "dark" },
   { id: "cyberpunk", name: "Cyberpunk", group: "dark" },
@@ -490,8 +491,9 @@ const Welcome = ({ welcomeData, onComplete }) => {
   // Restore step from navigation state if coming back from another page
   const [step, setStep] = useState(location.state?.welcomeStep || "language");
   const [stepDirection, setStepDirection] = useState(1);
-  const [selectedTheme, setSelectedTheme] = useState("purple");
-  const [showingLightThemes, setShowingLightThemes] = useState(true);
+  const [selectedTheme, setSelectedTheme] = useState("onyx");
+  // Opens on the dark group, where the default theme lives
+  const [showingLightThemes, setShowingLightThemes] = useState(false);
   // Theme shown in the preview while hovering a tile
   const [previewTheme, setPreviewTheme] = useState(null);
   const [privacyChecked, setPrivacyChecked] = useState(false);
@@ -542,7 +544,7 @@ const Welcome = ({ welcomeData, onComplete }) => {
     autoCreateShortcuts: true,
     autoUpdate: true,
     language: "en",
-    theme: "purple",
+    theme: "onyx",
     threadCount: 4,
   });
   const languagePromptRef = useRef(null);

@@ -1162,7 +1162,7 @@ function registerMiscHandlers() {
     if (isWindows) {
       spawnNotificationHelper([
         "--theme",
-        settings.theme || "purple",
+        settings.theme || "onyx",
         "--title",
         title,
         "--message",

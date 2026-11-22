@@ -8,7 +8,23 @@ import PageTours from "./PageTours";
 import { useNaturalDownloadScroll } from "@/hooks/useNaturalDownloadScroll";
 import Search from "@/pages/Search";
 import { PAGE_CONTENT_TOP_OFFSET_STYLE } from "@/lib/appChromeGeometry";
-import { getNavigationBottomSafeArea } from "@/lib/navigationGeometry";
+import {
+  getNavigationBottomSafeArea,
+  NAVIGATION_RAIL_WIDTH_PX,
+} from "@/lib/navigationGeometry";
+
+// Exposed as a CSS variable so pages pinned to the window (position: fixed)
+// can start to the right of the navigation rail
+const RAIL_WIDTH_STYLE = Object.freeze({
+  "--app-rail-width": `${NAVIGATION_RAIL_WIDTH_PX}px`,
+});
+// The scrollports step past the rail with padding rather than sitting beside
+// it, so a page can still reach under the translucent rail (Home's artwork)
+const MAIN_PADDING_LEFT = "calc(var(--app-rail-width) + 1rem)";
+
+// Pages whose artwork runs up under the transparent menu bar skip the spacer
+// that normally keeps content clear of it
+const bleedsUnderMenuBar = path => path === "/";
 
 const EASE_OUT = [0.22, 1, 0.36, 1];
 // The leaving page is pinned on top of the new one, so it has to drop off
@@ -97,12 +113,15 @@ const routeVariants = {
 // Pages whose root is pinned to the window (position: fixed) get a wrapper
 // that fills the window too. While a wrapper animates, its transform makes it
 // what fixed children are positioned against, and an unsized one squashes
-// them to nothing until the animation ends.
+// them to nothing until the animation ends. The wrapper itself stays at the
+// window edge and the page roots step past the rail, so the offset applies
+// once whether or not the wrapper is mid-animation.
 const fixedPageClass = path => {
   if (path === "/library" || path.startsWith("/folderview/")) return "fixed inset-0";
   // Ascend's sign-in and loading screens sit in normal flow, so its wrapper
   // also takes the main column's spacing and scrolls
-  if (path === "/ascend") return "fixed inset-0 overflow-y-auto px-4 pb-24 pt-8";
+  if (path === "/ascend")
+    return "fixed inset-0 overflow-y-auto pb-24 pl-[calc(var(--app-rail-width,0px)+1rem)] pr-4 pt-8";
   return null;
 };
 
@@ -219,17 +238,23 @@ const Layout = memo(() => {
       className={`flex flex-col bg-background text-foreground ${
         hasNavigationBottomSafeArea ? "h-screen overflow-hidden" : "min-h-screen"
       }`}
+      style={RAIL_WIDTH_STYLE}
     >
-      <div
-        className="shrink-0"
-        aria-hidden="true"
-        style={PAGE_CONTENT_TOP_OFFSET_STYLE}
-      />
+      {!bleedsUnderMenuBar(location.pathname) && (
+        <div
+          className="shrink-0"
+          aria-hidden="true"
+          style={PAGE_CONTENT_TOP_OFFSET_STYLE}
+        />
+      )}
       {/* Search is rendered persistently so scroll position and loaded games survive navigation */}
       <motion.main
         ref={searchScrollRef}
-        className="flex-1 overflow-y-auto px-4 pb-24"
-        style={{ display: isSearchPage ? "block" : "none" }}
+        className="flex-1 overflow-y-auto px-4 pb-12"
+        style={{
+          display: isSearchPage ? "block" : "none",
+          paddingLeft: MAIN_PADDING_LEFT,
+        }}
         initial={false}
         animate={
           isSearchPage
@@ -257,13 +282,14 @@ const Layout = memo(() => {
       {/* Other pages render normally via Outlet */}
       <main
         data-route-scroll-container
-        className={`flex-1 overflow-y-auto px-4 pb-24 ${
+        className={`flex-1 overflow-y-auto px-4 pb-12 ${
           hasNavigationBottomSafeArea ? "min-h-0" : ""
         }`}
         style={{
           display: isSearchPage ? "none" : "block",
-          // Content scrolls on behind the dock to the window edge; the padding
-          // lets the last of it come to rest above the dock
+          paddingLeft: MAIN_PADDING_LEFT,
+          // Settings scrolls inside this container; the padding lets the last
+          // of it come to rest clear of the window edge
           paddingBottom: navigationBottomSafeArea || undefined,
           scrollPaddingBottom: navigationBottomSafeArea || undefined,
         }}
@@ -277,7 +303,7 @@ const Layout = memo(() => {
           </AnimatePresence>
         )}
       </main>
-      <Navigation className="fixed bottom-0 left-0 right-0" />
+      <Navigation />
       {/* Keep one instance mounted while the tour navigates between pages. */}
       {showTour && <Tour onClose={handleCloseTour} />}
       <PageTours suppressed={showTour} />

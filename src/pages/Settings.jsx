@@ -122,6 +122,7 @@ const themes = [
   { id: "royal-pearl", name: "Royal Pearl", group: "light" },
 
   // Dark themes
+  { id: "onyx", name: "Onyx", group: "dark" },
   { id: "aurora", name: "Aurora", group: "dark" },
   { id: "midnight", name: "Midnight", group: "dark" },
   { id: "cyberpunk", name: "Cyberpunk", group: "dark" },
@@ -216,6 +217,12 @@ const getThemeColors = themeId => {
       primary: "bg-[#37228C]",
       secondary: "bg-[#ECE9F6]",
       text: "text-[#1E1646]",
+    },
+    onyx: {
+      bg: "bg-[#080808]",
+      primary: "bg-[#F2F6F8]",
+      secondary: "bg-[#121212]",
+      text: "text-[#EDEDED]",
     },
     "royal-night": {
       bg: "bg-[#120E26]",
@@ -1308,24 +1315,6 @@ function Settings() {
                       checked={settings.sideScrollBar}
                       onCheckedChange={() =>
                         handleSettingChange("sideScrollBar", !settings.sideScrollBar)
-                      }
-                    />
-                  </div>
-
-                  <div
-                    id="compact-dock-on-scroll"
-                    className="flex items-center justify-between"
-                  >
-                    <div className="space-y-0.5">
-                      <Label>{t("settings.compactDockOnScroll")}</Label>
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings.compactDockOnScrollDescription")}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.compactDockOnScroll !== false}
-                      onCheckedChange={value =>
-                        handleSettingChange("compactDockOnScroll", value)
                       }
                     />
                   </div>

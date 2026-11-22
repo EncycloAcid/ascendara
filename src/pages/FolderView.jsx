@@ -607,7 +607,7 @@ const FolderView = () => {
 
   return (
     <div
-      className="fixed inset-0 flex overflow-hidden bg-background"
+      className="fixed inset-0 left-[var(--app-rail-width,0px)] flex overflow-hidden bg-background"
       style={{ top: MENU_BAR_HEIGHT_PX }}
     >
       {/* ── Sidebar ── */}

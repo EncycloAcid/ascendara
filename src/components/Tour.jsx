@@ -17,8 +17,6 @@ import {
   CircleArrowDown,
   Compass,
   Library,
-  Maximize2,
-  Minimize2,
   Rocket,
   Search,
   Settings2,
@@ -59,20 +57,6 @@ const getSteps = t => [
     title: t("tour.navigationBar.title"),
     content: t("tour.navigationBar.content"),
     spotlight: "[data-tour='navigation']",
-  },
-  {
-    icon: Maximize2,
-    title: t("tour.resizing.title"),
-    content: t("tour.resizing.content"),
-    spotlight: "[data-tour='navigation']",
-    showResizeHint: true,
-  },
-  {
-    icon: Minimize2,
-    title: t("tour.compactDock.title"),
-    content: t("tour.compactDock.content"),
-    spotlight: "[data-tour='navigation']",
-    showCompactHint: true,
   },
   {
     icon: Search,
@@ -209,13 +193,8 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
     height: window.innerHeight,
   });
   const [isMuted, setIsMuted] = useState(readMuted);
-  const [navScale, setNavScale] = useState(
-    parseFloat(localStorage.getItem("navSize") || "100") / 100
-  );
 
   const cardRef = useRef(null);
-  const resizeIntervalRef = useRef(null);
-  const originalSize = useRef(null);
   const finishedRef = useRef(false);
 
   const step = steps[currentStep];
@@ -327,60 +306,6 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
     step.onEnter?.();
   }, [step]);
 
-  // Gently pulses the nav bar size to show it can be resized, then restores it
-  useEffect(() => {
-    if (!step.showResizeHint) return;
-    originalSize.current = localStorage.getItem("navSize") || "100";
-    let increasing = true;
-
-    resizeIntervalRef.current = setInterval(() => {
-      const currentSize = parseFloat(localStorage.getItem("navSize") || "100");
-      let newSize;
-      if (increasing) {
-        newSize = currentSize + 0.2;
-        if (newSize >= 100) increasing = false;
-      } else {
-        newSize = currentSize - 0.2;
-        if (newSize <= 95) increasing = true;
-      }
-      localStorage.setItem("navSize", newSize.toString());
-      window.dispatchEvent(new CustomEvent("navResize"));
-    }, 25);
-
-    return () => {
-      clearInterval(resizeIntervalRef.current);
-      localStorage.setItem("navSize", originalSize.current);
-      window.dispatchEvent(new CustomEvent("navResize"));
-    };
-  }, [step.showResizeHint]);
-
-  // Shows the dock folding into its compact scroll form and back, on a loop
-  useEffect(() => {
-    if (!step.showCompactHint) return;
-    const preview = compact =>
-      window.dispatchEvent(new CustomEvent("navCompactPreview", { detail: compact }));
-    let compact = false;
-    let timer;
-    const toggle = () => {
-      compact = !compact;
-      preview(compact);
-      timer = setTimeout(toggle, compact ? 1800 : 1400);
-    };
-    timer = setTimeout(toggle, 600);
-    return () => {
-      clearTimeout(timer);
-      preview(false);
-    };
-  }, [step.showCompactHint]);
-
-  useEffect(() => {
-    const handleNavResize = () => {
-      setNavScale(parseFloat(localStorage.getItem("navSize") || "100") / 100);
-    };
-    window.addEventListener("navResize", handleNavResize);
-    return () => window.removeEventListener("navResize", handleNavResize);
-  }, []);
-
   const nextStep = useCallback(() => {
     if (currentStep < steps.length - 1) {
       setDirection(1);
@@ -436,7 +361,7 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
 
   // Portaled to the body: tours mounted inside a page (like Ascend's, whose page sits
   // in a fixed wrapper) would otherwise be trapped in that page's stacking context and
-  // leave the menu bar and dock undimmed above them
+  // leave the menu bar and navigation rail undimmed above them
   return createPortal(
     <MotionConfig reducedMotion="user">
       <div
@@ -471,19 +396,6 @@ function Tour({ onClose, steps: customSteps, onFinish, sound = true }) {
               animate={{ opacity: [0.5, 0], scale: [1, 1.08] }}
               transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
             />
-            {step.showResizeHint &&
-              [
-                "-left-1.5 -top-1.5 cursor-nw-resize",
-                "-right-1.5 -top-1.5 cursor-ne-resize",
-              ].map(corner => (
-                <motion.div
-                  key={corner}
-                  className={`absolute h-4 w-4 rounded-md border-2 border-primary bg-background ${corner}`}
-                  style={{ scale: navScale }}
-                  animate={{ opacity: [1, 0.45, 1] }}
-                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                />
-              ))}
           </motion.div>
         )}
 

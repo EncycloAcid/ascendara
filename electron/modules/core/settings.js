@@ -93,7 +93,7 @@ class SettingsManager {
       autoUpdate: true,
       endOnClose: false,
       language: "en",
-      theme: "purple",
+      theme: "onyx",
       customTheme: [],
       threadCount: 16,
       // 12 was the default before; a 12 nobody chose moves to the new default.

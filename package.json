@@ -54,6 +54,7 @@
     "dist-mac-all": "python3 ./scripts/build_ascendara_mac.py --arch both"
   },
   "dependencies": {
+    "@fontsource-variable/space-grotesk": "^5.2.0",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-aspect-ratio": "^1.1.0",

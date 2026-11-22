@@ -8,8 +8,19 @@ module.exports = {
       transitionTimingFunction: {
         "smooth-out": "cubic-bezier(0.32, 0.72, 0, 1)",
       },
+      fontFamily: {
+        display: [
+          '"Space Grotesk Variable"',
+          '"Space Grotesk"',
+          "system-ui",
+          "sans-serif",
+        ],
+      },
       colors: {
         primary: "rgb(var(--color-primary) / <alpha-value>)",
+        // Only themes with a light primary set this; elsewhere the variable is
+        // undefined, so the color falls back to the inherited text color
+        "primary-foreground": "rgb(var(--color-primary-foreground) / <alpha-value>)",
         secondary: "rgb(var(--color-secondary) / <alpha-value>)",
         background: "rgb(var(--color-background) / <alpha-value>)",
         foreground: "rgb(var(--color-foreground) / <alpha-value>)",
@@ -345,6 +356,28 @@ module.exports = {
           "--color-card-foreground": "245 236 212",
           "--color-popover": "28 22 56",
           "--color-popover-foreground": "245 236 212",
+        },
+        // Monochrome launcher look: near-black surfaces, white accent
+        '[data-theme="onyx"]': {
+          "--color-background": "8 8 8",
+          "--color-foreground": "237 237 237",
+          "--color-primary": "242 246 248",
+          "--color-primary-foreground": "10 10 10",
+          "--color-secondary": "18 18 18",
+          "--color-muted": "24 24 24",
+          "--color-muted-foreground": "138 138 140",
+          "--color-accent": "26 26 26",
+          "--color-accent-foreground": "237 237 237",
+          "--color-border": "32 32 33",
+          "--color-input": "40 40 42",
+          "--color-ring": "242 246 248",
+          "--color-card": "14 14 14",
+          "--color-card-foreground": "237 237 237",
+          "--color-popover": "16 16 16",
+          "--color-popover-foreground": "237 237 237",
+          "--color-nav-background": "8 8 8",
+          "--color-startup-background": "8 8 8",
+          "--color-startup-accent": "242 246 248",
         },
         '[data-theme="aurora"]': {
           "--color-background": "8 18 24",

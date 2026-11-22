@@ -2814,10 +2814,16 @@
       "madeWith": "Made with ❤️ by Santiago & Contributors",
       "title": "Consider Spreading the Word"
     },
+    "hero": {
+      "badge": "Trending now",
+      "size": "Download size",
+      "updated": "Last updated"
+    },
     "mostRecentlyUpdated": "Most Recently Updated",
     "noRecentGames": "Your top 3 recent games show here",
     "noRecentGamesHint": "Start playing to see your games",
     "onlineGames": "Online Games",
+    "popular": "Popular",
     "popularCategories": "Popular Categories",
     "quickAccess": {
       "description": "Choose which page you want to quickly access from the home screen.",
@@ -2826,8 +2832,25 @@
     "recentGames": "Recent Games",
     "searchPlaceholder": "Search for games...",
     "searchSubtitle": "Press to start searching",
+    "tabs": {
+      "action": "Action",
+      "online": "Online",
+      "top": "Top",
+      "updated": "Updated"
+    },
     "topGames": "Top Games",
-    "viewGame": "View Game"
+    "viewGame": "View Game",
+    "weekly": {
+      "avgSession": "Avg. session",
+      "favoriteGame": "Favorite game",
+      "favoriteHours": "{{hours}} this week",
+      "hoursPlayed": "Hours played",
+      "installed": "Games installed",
+      "launches": "Launches",
+      "newGames": "New games",
+      "noFavorite": "Play a game to see it here",
+      "title": "Your Weekly Stats"
+    }
   },
   "imageCropper": {
     "cancel": "Cancel",

@@ -5,6 +5,7 @@ import { loadPlugins } from "@/lib/plugins.js";
 
 import ReactDOM from "react-dom/client";
 import App from "./app";
+import "@fontsource-variable/space-grotesk";
 import "./app.css";
 import "./i18n";
 

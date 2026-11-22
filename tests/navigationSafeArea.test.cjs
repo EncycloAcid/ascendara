@@ -27,45 +27,23 @@ async function loadGeometry() {
   return import(url);
 }
 
-test("Settings safe area clears every dock presentation state", async () => {
+test("Settings keeps a bounded scrollport with room at the bottom", async () => {
   const geometry = await loadGeometry();
 
-  assert.equal(
-    geometry.NAVIGATION_COMPACT_FOOTPRINT_PX,
-    geometry.NAVIGATION_EDGE_PADDING_PX +
-      Math.max(
-        geometry.NAVIGATION_COMPACT_ITEM_HEIGHT_PX,
-        geometry.NAVIGATION_COMPACT_SEPARATOR_HEIGHT_PX
-      ) +
-      geometry.NAVIGATION_COMPACT_PADDING_Y_PX * 2 +
-      geometry.NAVIGATION_SHELL_BORDER_PX * 2
-  );
-  assert.equal(
-    geometry.NAVIGATION_EXPANDED_FOOTPRINT_PX,
-    geometry.NAVIGATION_EDGE_PADDING_PX +
-      Math.max(
-        geometry.NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
-        geometry.NAVIGATION_EXPANDED_SEPARATOR_HEIGHT_PX
-      ) +
-      geometry.NAVIGATION_EXPANDED_PADDING_Y_PX * 2 +
-      geometry.NAVIGATION_SHELL_BORDER_PX * 2
-  );
-  assert.equal(
-    geometry.NAVIGATION_SETTINGS_SAFE_AREA_PX,
-    Math.max(
-      geometry.NAVIGATION_COMPACT_FOOTPRINT_PX,
-      geometry.NAVIGATION_EXPANDED_FOOTPRINT_PX
-    ) + geometry.NAVIGATION_SAFE_GAP_PX
-  );
-  assert.ok(
-    geometry.NAVIGATION_SETTINGS_SAFE_AREA_PX >
-      geometry.NAVIGATION_EXPANDED_FOOTPRINT_PX,
-    "Settings content must be able to rest above even an expanded/engaged fixed dock"
-  );
-
+  assert.ok(geometry.NAVIGATION_SETTINGS_SAFE_AREA_PX > 0);
   assert.equal(
     geometry.getNavigationBottomSafeArea("/settings"),
     geometry.NAVIGATION_SETTINGS_SAFE_AREA_PX
+  );
+});
+
+test("navigation rail is wider than the tiles stacked inside it", async () => {
+  const geometry = await loadGeometry();
+
+  assert.ok(geometry.NAVIGATION_RAIL_TILE_PX > 0);
+  assert.ok(
+    geometry.NAVIGATION_RAIL_WIDTH_PX > geometry.NAVIGATION_RAIL_TILE_PX,
+    "Tiles need side padding inside the rail"
   );
 });
 
@@ -93,25 +71,22 @@ test("Layout reserves a persistent Settings viewport exclusion zone", () => {
   assert.match(layoutSource, /paddingBottom: navigationBottomSafeArea \|\| undefined/);
   assert.match(layoutSource, /scrollPaddingBottom: navigationBottomSafeArea \|\| undefined/);
 
-  // The bounded scrollport runs to the window edge behind the dock; the
-  // safe-area value is its bottom padding, so the last content rests above it.
+  // The bounded scrollport runs to the window edge; the safe-area value is its
+  // bottom padding, so the last content rests clear of it.
   const mainIndex = layoutSource.indexOf("data-route-scroll-container");
   const navIndex = layoutSource.indexOf("<Navigation", mainIndex);
   const mainBlock = layoutSource.slice(mainIndex, navIndex);
   assert.match(mainBlock, /overflow-y-auto/);
   assert.match(mainBlock, /paddingBottom: navigationBottomSafeArea/);
 
-  for (const token of [
-    "NAVIGATION_EDGE_PADDING_PX",
-    "NAVIGATION_COMPACT_ITEM_HEIGHT_PX",
-    "NAVIGATION_COMPACT_SEPARATOR_HEIGHT_PX",
-    "NAVIGATION_COMPACT_PADDING_Y_PX",
-    "NAVIGATION_EXPANDED_ITEM_HEIGHT_PX",
-    "NAVIGATION_EXPANDED_SEPARATOR_HEIGHT_PX",
-    "NAVIGATION_EXPANDED_PADDING_Y_PX",
-  ]) {
+  for (const token of ["NAVIGATION_RAIL_WIDTH_PX", "NAVIGATION_RAIL_TILE_PX"]) {
     assert.match(navigationSource, new RegExp(token));
   }
+
+  // Content starts to the right of the rail, and pages pinned to the window
+  // read the same width from a CSS variable
+  assert.match(layoutSource, /NAVIGATION_RAIL_WIDTH_PX/);
+  assert.match(layoutSource, /"--app-rail-width"/);
 });
 
 test("Settings treats the bounded route scrollport as its scroll authority", () => {

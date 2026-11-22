@@ -1,75 +1,170 @@
 import React, { useState, useEffect, memo, useCallback, useMemo, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
 import { getConfiguredProviders } from "@/services/downloads/debridService";
 import {
   Home,
   Search,
   Library,
   Settings2,
-  ChevronRight,
   Package,
   User,
   ServerIcon,
   CircleArrowDown,
   AtSign,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAscendNotificationCount } from "@/services/ascend/ascendNotificationBadgeService";
 import { useNewSecurityFeature } from "@/services/ascend/newFeatureBadgeService";
 import { prefetchAscendData } from "@/services/ascend/ascendPrefetch";
+import recentGamesService from "@/services/library/recentGamesService";
+import { recordLibrarySnapshot } from "@/services/library/weeklyActivityService";
 import {
-  NAVIGATION_EDGE_PADDING_PX,
-  NAVIGATION_COMPACT_ITEM_HEIGHT_PX,
-  NAVIGATION_COMPACT_SEPARATOR_HEIGHT_PX,
-  NAVIGATION_COMPACT_PADDING_Y_PX,
-  NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
-  NAVIGATION_EXPANDED_SEPARATOR_HEIGHT_PX,
-  NAVIGATION_EXPANDED_PADDING_Y_PX,
+  NAVIGATION_RAIL_WIDTH_PX,
+  NAVIGATION_RAIL_TILE_PX,
 } from "@/lib/navigationGeometry";
+import { MENU_BAR_HEIGHT_PX } from "@/lib/appChromeGeometry";
+import { cn, imageDataUrlFromBase64, sanitizeText } from "@/lib/utils";
 
-// A dock item collapses to no width, and the negative margin cancels the dock's
-// 8px gap, so its neighbours close up fully while it is hidden
-const DOCK_ITEM_HIDDEN = { width: 0, marginLeft: -8, opacity: 0, scale: 0.3, y: 8 };
-const DOCK_ITEM_SHOWN = {
-  width: NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
-  height: NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
-  marginLeft: 0,
-  opacity: 1,
-  scale: 1,
-  y: 0,
-};
-// While a page is scrolled, the dock shrinks to a row of colour dots; the current page's dot
-// stretches into a short pill
-const dockItemCompact = active => ({
-  ...DOCK_ITEM_SHOWN,
-  width: active ? 22 : 8,
-  height: NAVIGATION_COMPACT_ITEM_HEIGHT_PX,
+// Recently played games shown as cover tiles in the rail
+const MAX_RAIL_GAMES = 4;
+const railImageCache = new Map(); // game name -> data URL
+
+const tileClass = active =>
+  cn(
+    "group relative flex shrink-0 items-center justify-center rounded-[10px] outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring",
+    active
+      ? "bg-primary text-secondary shadow-[0_0_24px_rgb(var(--color-primary)/0.15)]"
+      : "bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground"
+  );
+
+const Badge = ({ count }) =>
+  count > 0 ? (
+    <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-background bg-primary px-1 text-[10px] font-semibold text-secondary">
+      {count > 99 ? "99+" : count}
+    </span>
+  ) : null;
+
+const RailTooltip = ({ label, children }) => (
+  <Tooltip delayDuration={150}>
+    <TooltipTrigger asChild>{children}</TooltipTrigger>
+    <TooltipContent side="right" sideOffset={12}>
+      {label}
+    </TooltipContent>
+  </Tooltip>
+);
+
+const RailGameThumb = memo(({ game, active, onOpen }) => {
+  const name = game.game || game.name;
+  const [image, setImage] = useState(() => railImageCache.get(name) || null);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const base64 = await window.electron.getGameImage(name);
+        if (!base64 || !mounted) return;
+        const dataUrl = imageDataUrlFromBase64(base64);
+        railImageCache.set(name, dataUrl);
+        setImage(dataUrl);
+      } catch {
+        // No cover on disk yet; the initial stays
+      }
+    };
+    if (!railImageCache.has(name)) load();
+    const handleCoverUpdate = event => {
+      const { gameName, dataUrl } = event.detail || {};
+      if (gameName === name && dataUrl && mounted) {
+        railImageCache.set(name, dataUrl);
+        setImage(dataUrl);
+      }
+    };
+    window.addEventListener("game-cover-updated", handleCoverUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener("game-cover-updated", handleCoverUpdate);
+    };
+  }, [name]);
+
+  const label = sanitizeText(name);
+  return (
+    <RailTooltip label={label}>
+      <button
+        type="button"
+        onClick={() => onOpen(game)}
+        aria-label={label}
+        className={cn(tileClass(false), active && "ring-2 ring-primary")}
+        style={{ width: NAVIGATION_RAIL_TILE_PX, height: NAVIGATION_RAIL_TILE_PX }}
+      >
+        <span className="absolute inset-1 overflow-hidden rounded-md bg-card">
+          {image ? (
+            <img
+              src={image}
+              alt=""
+              draggable="false"
+              className="h-full w-full object-cover grayscale-[35%] transition duration-300 group-hover:scale-105 group-hover:grayscale-0"
+            />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">
+              {label.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </span>
+      </button>
+    </RailTooltip>
+  );
 });
-// How far from the top a page has to be scrolled before the dock goes compact
-const COMPACT_MIN_SCROLL = 80;
-const DOCK_SPRING = { type: "spring", stiffness: 380, damping: 30 };
-const DOCK_ITEM_TRANSITION = { ...DOCK_SPRING, opacity: { duration: 0.2 } };
-// The shell rides the same spring as the items so the two never drift apart. Its corner
-// radius stays put: the compact dock is short enough that 18px already rounds it into a
-// pill, and a fixed radius can't snap the way a jump to rounded-full does
-const DOCK_SHELL_EXPANDED = {
-  paddingTop: NAVIGATION_EXPANDED_PADDING_Y_PX,
-  paddingBottom: NAVIGATION_EXPANDED_PADDING_Y_PX,
-  paddingLeft: 12,
-  paddingRight: 12,
-  gap: 8,
-};
-const DOCK_SHELL_COMPACT = {
-  paddingTop: NAVIGATION_COMPACT_PADDING_Y_PX,
-  paddingBottom: NAVIGATION_COMPACT_PADDING_Y_PX,
-  paddingLeft: 14,
-  paddingRight: 14,
-  gap: 6,
+RailGameThumb.displayName = "RailGameThumb";
+
+const RailAvatar = ({ active, label }) => {
+  const { user, userData } = useAuth();
+  const [localImage] = useState(() => {
+    try {
+      return localStorage.getItem("profileImage");
+    } catch {
+      return null;
+    }
+  });
+  const [failed, setFailed] = useState(false);
+  const photo = user?.photoURL || userData?.photoURL || localImage;
+
+  return (
+    <RailTooltip label={label}>
+      <Link
+        to="/profile"
+        data-nav-path="/profile"
+        aria-label={label}
+        className={cn(
+          "group relative flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-background/60 outline-none ring-1 ring-border/70 transition focus-visible:ring-2 focus-visible:ring-ring",
+          active && "ring-2 ring-primary"
+        )}
+      >
+        <span className="flex h-[48px] w-[48px] items-center justify-center overflow-hidden rounded-full bg-muted text-muted-foreground transition-colors group-hover:text-foreground">
+          {photo && !failed ? (
+            <img
+              src={photo}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-cover"
+              onError={() => setFailed(true)}
+            />
+          ) : (
+            <User className="h-5 w-5" />
+          )}
+        </span>
+      </Link>
+    </RailTooltip>
+  );
 };
 
-const Navigation = memo(({ items }) => {
+const Navigation = memo(() => {
   const { t } = useLanguage();
   const { settings } = useSettings();
   // One entry for all services with a downloads page, shown only while one is in use
@@ -78,56 +173,22 @@ const Navigation = memo(({ items }) => {
   );
   const location = useLocation();
   const navigate = useNavigate();
-  const [size, setSize] = useState(() => {
-    const savedSize = localStorage.getItem("navSize");
-    return savedSize ? parseFloat(savedSize) : 100;
-  });
   const [downloadCount, setDownloadCount] = useState(0);
+  const [recentGames, setRecentGames] = useState([]);
   // Unseen notifications, plus one while two-step verification is new to this member
   const ascendNotificationCount =
     useAscendNotificationCount() + (useNewSecurityFeature() ? 1 : 0);
   const downloadCountRef = useRef(0);
-  const isGamePage = ["/download", "/gamescreen"].includes(location.pathname);
   // The router renders the next page in a transition, so location only
   // changes once that page is ready. Track the clicked path separately so the
-  // dock highlights it on the very next frame instead of after the render.
+  // rail highlights it on the very next frame instead of after the render.
   const [pendingPath, setPendingPath] = useState(null);
   useEffect(() => setPendingPath(null), [location.pathname]);
   const activePath = pendingPath ?? location.pathname;
-
-  const handleMouseDown = useCallback(
-    (e, isLeft) => {
-      const startX = e.clientX;
-      const startSize = size;
-
-      const handleMouseMove = moveEvent => {
-        moveEvent.preventDefault();
-        const deltaX = moveEvent.clientX - startX;
-        const adjustedDelta = isLeft ? -deltaX : deltaX;
-        const newSize = Math.min(100, Math.max(50, startSize + adjustedDelta / 5));
-        setSize(newSize);
-        localStorage.setItem("navSize", newSize.toString());
-
-        window.dispatchEvent(new CustomEvent("navResize"));
-      };
-
-      const handleMouseUp = () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [size]
-  );
-
-  const navStyle = useMemo(
-    () => ({
-      transform: `scale(${size / 100})`,
-    }),
-    [size]
-  );
+  const openGameName =
+    location.pathname === "/gamescreen"
+      ? location.state?.gameData?.game || location.state?.gameData?.name
+      : null;
 
   const isActive = useCallback(
     path => {
@@ -159,75 +220,32 @@ const Navigation = memo(({ items }) => {
     [activePath]
   );
 
-  const navItems = useMemo(() => {
-    const items = [
-      {
-        path: "/",
-        label: t("common.home"),
-        icon: Home,
-        color: "from-blue-400 to-blue-600",
-      },
-      {
-        path: "/search",
-        label: t("common.search"),
-        icon: Search,
-        color: "from-violet-400 to-violet-600",
-      },
-      {
-        path: "/library",
-        label: t("common.library"),
-        icon: Library,
-        color: "from-emerald-400 to-emerald-600",
-      },
-      {
-        path: "/downloads",
-        label: t("common.downloads"),
-        icon: CircleArrowDown,
-        color: "from-orange-400 to-orange-600",
-      },
-      {
-        path: "/debriddownloads",
-        label: t("debrid.downloadsTitle"),
-        icon: ServerIcon,
-        hidden: !debridNavVisible,
-        color: "from-yellow-400 to-amber-500",
-      },
-      // Splits the download pages from the rest of the dock
-      { separator: true, path: "separator" },
-    ];
-
-    items.push({
-      path: "/profile",
-      label: t("common.profile"),
-      icon: User,
-      color: "from-rose-400 to-rose-600",
-    });
-
-    items.push({
-      path: "/ascend",
-      label: t("common.ascend"),
-      icon: AtSign,
-      color: "from-fuchsia-400 to-fuchsia-600",
-    });
-
-    if (settings.viewWorkshopPage) {
-      items.push({
-        path: "/workshopdownloader",
-        label: t("common.workshopDownloader"),
-        icon: Package,
-        color: "from-lime-400 to-lime-600",
-      });
-    }
-
-    items.push({
-      path: "/settings",
-      label: t("common.preferences"),
-      icon: Settings2,
-      color: "from-slate-400 to-slate-600",
-    });
-
-    return items;
-  }, [t, settings, debridNavVisible]);
+  const { pageItems, footerItems } = useMemo(
+    () => ({
+      pageItems: [
+        { path: "/", label: t("common.home"), icon: Home },
+        { path: "/library", label: t("common.library"), icon: Library },
+        { path: "/downloads", label: t("common.downloads"), icon: CircleArrowDown },
+        {
+          path: "/debriddownloads",
+          label: t("debrid.downloadsTitle"),
+          icon: ServerIcon,
+          hidden: !debridNavVisible,
+        },
+      ],
+      footerItems: [
+        { path: "/ascend", label: t("common.ascend"), icon: AtSign },
+        {
+          path: "/workshopdownloader",
+          label: t("common.workshopDownloader"),
+          icon: Package,
+          hidden: !settings.viewWorkshopPage,
+        },
+        { path: "/settings", label: t("common.preferences"), icon: Settings2 },
+      ],
+    }),
+    [t, settings.viewWorkshopPage, debridNavVisible]
+  );
 
   useEffect(() => {
     const checkDownloaderStatus = async () => {
@@ -300,13 +318,49 @@ const Navigation = memo(({ items }) => {
     };
   }, [settings?.downloadDirectory, location.pathname]);
 
+  // Recently played games for the rail. Reading the library here also records
+  // today's playtime totals for Home's weekly stats, since the rail is always
+  // mounted and refreshes whenever a game closes.
   useEffect(() => {
-    const handleResize = () => {
-      const newSize = localStorage.getItem("navSize");
-      if (newSize) {
-        setSize(parseFloat(newSize));
+    let canceled = false;
+    const load = async () => {
+      try {
+        const [installed, custom] = await Promise.all([
+          window.electron.getGames(),
+          window.electron.getCustomGames(),
+        ]);
+        const library = [
+          ...(installed || []).map(game => ({ ...game, isCustom: false })),
+          ...(custom || []).map(game => ({ ...game, isCustom: true })),
+        ];
+        recordLibrarySnapshot(library);
+        const list = recentGamesService
+          .getRecentGames()
+          .map(recent => library.find(game => (game.game || game.name) === recent.game))
+          .filter(Boolean)
+          .slice(0, MAX_RAIL_GAMES);
+        if (canceled) return;
+        setRecentGames(previous =>
+          previous.length === list.length &&
+          previous.every((game, index) => game.game === list[index].game)
+            ? previous
+            : list
+        );
+      } catch (error) {
+        console.error("Error loading recent games for the rail:", error);
       }
     };
+    load();
+    const unsubLaunch = window.electron.onGameLaunchSuccess?.(load);
+    const unsubClosed = window.electron.onGameClosed?.(load);
+    return () => {
+      canceled = true;
+      if (typeof unsubLaunch === "function") unsubLaunch();
+      if (typeof unsubClosed === "function") unsubClosed();
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
     /**  @param {KeyboardEvent} event */
     const handleCtrlNavigation = event => {
       if (!(event.ctrlKey || event.metaKey)) return;
@@ -339,227 +393,95 @@ const Navigation = memo(({ items }) => {
     };
 
     window.addEventListener("keydown", handleCtrlNavigation);
-    window.addEventListener("navResize", handleResize);
-    return () => {
-      window.removeEventListener("keydown", handleCtrlNavigation);
-      window.removeEventListener("navResize", handleResize);
-    };
+    return () => window.removeEventListener("keydown", handleCtrlNavigation);
   }, []);
 
-  const compactEnabled = settings.compactDockOnScroll !== false;
-  const [scrolled, setScrolled] = useState(false);
-  const [dockEngaged, setDockEngaged] = useState(false);
-  useEffect(() => {
-    setScrolled(false);
-    if (!compactEnabled) return undefined;
-    // Some pages (Ascend) scroll inside their own container instead of the window,
-    // so listen in the capture phase and follow whichever large area is scrolling.
-    // Either direction counts: the dock stays compact until the page is back near the top
-    const handleScroll = event => {
-      const target = event.target;
-      const isPage = target === document || target === document.documentElement;
-      // Ignore small scrollers like dropdowns and carousels
-      if (!isPage && target.clientHeight < window.innerHeight * 0.5) return;
-      // Dialogs and popovers scroll over the page, not as it
-      if (
-        !isPage &&
-        target.closest?.(
-          '[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]'
-        )
-      )
-        return;
-      const y = isPage ? window.scrollY : target.scrollTop;
-      setScrolled(y >= COMPACT_MIN_SCROLL);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
-    return () => window.removeEventListener("scroll", handleScroll, { capture: true });
-  }, [compactEnabled, location.pathname]);
-  // The welcome tour folds the dock in and out to show this off, setting or not
-  const [compactPreview, setCompactPreview] = useState(false);
-  useEffect(() => {
-    const handlePreview = event => setCompactPreview(event.detail === true);
-    window.addEventListener("navCompactPreview", handlePreview);
-    return () => window.removeEventListener("navCompactPreview", handlePreview);
-  }, []);
-  // Hovering or tabbing into the dock opens it back up
-  const compact = compactPreview || (compactEnabled && scrolled && !dockEngaged);
-  // Stays parked while hovered, so the opened dock doesn't slide out from under the cursor
-  const parkRight = isGamePage && compactEnabled && scrolled;
+  const openGame = useCallback(
+    game => navigate("/gamescreen", { state: { gameData: game } }),
+    [navigate]
+  );
+
+  const renderItem = item => {
+    if (item.hidden) return null;
+    const active = isActive(item.path);
+    const badge =
+      item.path === "/downloads"
+        ? downloadCount
+        : item.path === "/ascend"
+          ? ascendNotificationCount
+          : 0;
+    return (
+      <RailTooltip key={item.path} label={item.label}>
+        <Link
+          to={item.path}
+          // A stable selector for plugins and themes
+          data-nav-path={item.path}
+          aria-label={item.label}
+          aria-current={active ? "page" : undefined}
+          onClick={() => {
+            if (item.path !== location.pathname) setPendingPath(item.path);
+          }}
+          // Fetch Ascend's data on the way to the click
+          onPointerEnter={item.path === "/ascend" ? prefetchAscendData : undefined}
+          className={tileClass(active)}
+          style={{ width: NAVIGATION_RAIL_TILE_PX, height: NAVIGATION_RAIL_TILE_PX }}
+        >
+          <item.icon className="h-5 w-5" strokeWidth={1.75} />
+          <Badge count={badge} />
+        </Link>
+      </RailTooltip>
+    );
+  };
+
+  const searchItem = { path: "/search", label: t("common.search"), icon: Search };
 
   return (
-    <div
-      className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 flex select-none justify-center"
-      style={{ padding: NAVIGATION_EDGE_PADDING_PX }}
-    >
-      {/* Scrolled on a game page, the compact dock glides to the bottom-right corner,
-          clear of the content. A transform percentage is the element's own width, so
-          this lands its right edge at the window's padding while it shrinks */}
-      <div
-        className="transition-transform duration-500"
+    <TooltipProvider>
+      <nav
+        aria-label={t("tour.navigationBar.title")}
+        className="fixed bottom-0 left-0 top-0 z-40 flex select-none flex-col items-center border-r border-border/60 pb-4 backdrop-blur-xl"
         style={{
-          transform: parkRight
-            ? `translateX(calc(50vw - 50% - ${NAVIGATION_EDGE_PADDING_PX}px))`
-            : "translateX(0)",
-          transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+          width: NAVIGATION_RAIL_WIDTH_PX,
+          paddingTop: MENU_BAR_HEIGHT_PX + 4,
+          backgroundColor:
+            "rgb(var(--color-nav-background, var(--color-background)) / 0.78)",
         }}
+        data-tour="navigation"
+        // Slides in from the window edge as the boot logo lands (app.css)
+        data-boot-dock
       >
-        <div
-          className="nav-container relative max-w-xl"
-          style={{
-            ...navStyle,
-            transformOrigin: parkRight ? "bottom right" : "bottom center",
-          }}
-          data-tour="navigation"
-        >
-          {/* data-boot-dock: slides up from the window edge as the boot logo lands (app.css) */}
-          <motion.div
-            className="pointer-events-auto relative mx-auto flex w-fit items-center justify-center rounded-[18px] border border-border shadow-lg backdrop-blur-lg"
-            initial={false}
-            animate={compact ? DOCK_SHELL_COMPACT : DOCK_SHELL_EXPANDED}
-            transition={DOCK_SPRING}
-            onPointerEnter={() => setDockEngaged(true)}
-            onPointerLeave={() => setDockEngaged(false)}
-            onFocus={() => setDockEngaged(true)}
-            onBlur={event => {
-              if (!event.currentTarget.contains(event.relatedTarget))
-                setDockEngaged(false);
-            }}
-            data-boot-dock
-            style={{
-              backgroundColor:
-                "rgb(var(--color-nav-background, var(--color-background)) / 0.8)",
-            }}
-          >
-            <div
-              className="pointer-events-auto absolute -left-2 -top-2 h-4 w-4 cursor-nw-resize"
-              onMouseDown={e => handleMouseDown(e, true)}
-            />
-            <div
-              className="pointer-events-auto absolute -right-2 -top-2 h-4 w-4 cursor-ne-resize"
-              onMouseDown={e => handleMouseDown(e, false)}
-            />
+        <RailAvatar active={isActive("/profile")} label={t("common.profile")} />
 
-            {/* Pages that are switched on or off (debrid, workshop) grow into the dock
-              and shrink back out, pushing their neighbours aside as they go */}
-            <AnimatePresence initial={false}>
-              {navItems.map(item =>
-                item.hidden ? null : item.separator ? (
-                  <motion.div
-                    key={item.path}
-                    className="w-px shrink-0 rounded-full bg-border/50"
-                    initial={false}
-                    animate={
-                      compact
-                        ? {
-                            height: NAVIGATION_COMPACT_SEPARATOR_HEIGHT_PX,
-                            marginLeft: 2,
-                            marginRight: 2,
-                          }
-                        : {
-                            height: NAVIGATION_EXPANDED_SEPARATOR_HEIGHT_PX,
-                            marginLeft: 0,
-                            marginRight: 0,
-                          }
-                    }
-                    transition={DOCK_SPRING}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-4">
+          <div className="flex flex-col items-center gap-1.5 rounded-[14px] border border-border/60 bg-card/80 p-1.5 shadow-[0_8px_32px_rgb(0_0_0/0.35)]">
+            {pageItems.map(renderItem)}
+            {recentGames.length > 0 && (
+              // Short windows keep the page buttons and drop the game covers
+              <div
+                data-tour="home-recent"
+                className="flex flex-col items-center gap-1.5 [@media(max-height:760px)]:hidden"
+              >
+                <div className="my-0.5 h-px w-8 bg-border/70" aria-hidden="true" />
+                {recentGames.map(game => (
+                  <RailGameThumb
+                    key={game.game || game.name}
+                    game={game}
+                    active={openGameName === (game.game || game.name)}
+                    onOpen={openGame}
                   />
-                ) : (
-                  <motion.div
-                    key={item.path}
-                    // A stable selector for plugins and themes
-                    data-nav-path={item.path}
-                    className="relative flex shrink-0 items-center justify-center"
-                    initial={{
-                      ...DOCK_ITEM_HIDDEN,
-                      height: compact
-                        ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX
-                        : NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
-                    }}
-                    animate={
-                      compact ? dockItemCompact(isActive(item.path)) : DOCK_ITEM_SHOWN
-                    }
-                    exit={{
-                      ...DOCK_ITEM_HIDDEN,
-                      height: compact
-                        ? NAVIGATION_COMPACT_ITEM_HEIGHT_PX
-                        : NAVIGATION_EXPANDED_ITEM_HEIGHT_PX,
-                    }}
-                    transition={DOCK_ITEM_TRANSITION}
-                  >
-                    <motion.span
-                      aria-hidden="true"
-                      className={`pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br ${item.color} ${
-                        compact && item.icon === CircleArrowDown && downloadCount > 0
-                          ? "animate-pulse"
-                          : ""
-                      }`}
-                      initial={false}
-                      animate={{
-                        opacity: compact ? (isActive(item.path) ? 1 : 0.6) : 0,
-                      }}
-                      // The dots and icons overlap as they swap, so the dock never
-                      // looks empty halfway through
-                      transition={{ duration: compact ? 0.3 : 0.4, ease: "easeInOut" }}
-                    />
-                    <motion.div
-                      className={`flex shrink-0 ${compact ? "pointer-events-none" : ""}`}
-                      initial={false}
-                      animate={{ opacity: compact ? 0 : 1, scale: compact ? 0.6 : 1 }}
-                      transition={{ duration: compact ? 0.2 : 0.3, ease: "easeOut" }}
-                    >
-                      <Link
-                        to={item.path}
-                        onClick={() => {
-                          if (item.path !== location.pathname) setPendingPath(item.path);
-                        }}
-                        // Fetch Ascend's data on the way to the click
-                        onPointerEnter={
-                          item.path === "/ascend" ? prefetchAscendData : undefined
-                        }
-                        className={`group relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ${
-                          isActive(item.path)
-                            ? "z-10 scale-110 bg-primary text-background"
-                            : "z-0 scale-100 text-muted-foreground hover:z-10 hover:scale-110 hover:bg-secondary hover:text-foreground"
-                        }`}
-                      >
-                        <div
-                          className={`absolute inset-0 rounded-xl bg-gradient-to-br ${item.color} transition-opacity duration-300 ${isActive(item.path) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-                        />
-                        {/* The gradient layer above fades the active colour in; a gradient set
-                            here would swap instantly, since background images can't transition */}
-                        <div
-                          className={`relative flex h-12 w-12 items-center justify-center rounded-lg transition-colors duration-300 ${
-                            isActive(item.path) ? "" : "group-hover:bg-white/10"
-                          }`}
-                        >
-                          <item.icon className="h-5 w-5" />
-                          {item.icon === CircleArrowDown && downloadCount > 0 && (
-                            <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
-                              {downloadCount}
-                            </div>
-                          )}
-                          {item.path === "/ascend" && ascendNotificationCount > 0 && (
-                            <div className="text-primary-foreground absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/90 px-1 text-[10px] font-semibold shadow-lg shadow-primary/25 backdrop-blur-sm">
-                              {ascendNotificationCount > 99
-                                ? "99+"
-                                : ascendNotificationCount}
-                            </div>
-                          )}
-                        </div>
-                        <div className="pointer-events-none absolute -top-10 translate-y-2 transform whitespace-nowrap rounded-lg border border-border bg-background/95 px-3 py-1.5 text-sm font-medium text-foreground opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                          {item.label}
-                          <ChevronRight className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-90 transform text-border" />
-                        </div>
-                      </Link>
-                    </motion.div>
-                  </motion.div>
-                )
-              )}
-            </AnimatePresence>
-          </motion.div>
+                ))}
+                <div className="my-0.5 h-px w-8 bg-border/70" aria-hidden="true" />
+              </div>
+            )}
+            {renderItem(searchItem)}
+          </div>
         </div>
-      </div>
-    </div>
+
+        <div className="flex flex-col items-center gap-1.5">
+          {footerItems.map(renderItem)}
+        </div>
+      </nav>
+    </TooltipProvider>
   );
 });
 

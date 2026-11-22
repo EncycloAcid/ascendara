@@ -12,6 +12,7 @@ import { readBootTheme, recordBootAppearance } from "@/lib/bootAppearance";
 const ThemeContext = createContext();
 
 const DARK_THEMES = new Set([
+  "onyx",
   "dark",
   "midnight",
   "cyberpunk",
@@ -99,7 +100,7 @@ export const clearCustomTheme = () => {
 export function ThemeProvider({ children }) {
   // Start from the last launch's theme (the boot screen already uses it) so the
   // app doesn't flash the default theme while settings load.
-  const [theme, setThemeState] = useState(() => readBootTheme("purple"));
+  const [theme, setThemeState] = useState(() => readBootTheme("onyx"));
   const [customColors, setCustomColors] = useState(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -166,10 +167,11 @@ export function ThemeProvider({ children }) {
   return (
     <NextThemeProvider
       attribute="data-theme"
-      defaultTheme="purple"
+      defaultTheme="onyx"
       enableSystem={false}
       forcedTheme={theme}
       themes={[
+        "onyx",
         "light",
         "dark",
         "midnight",
