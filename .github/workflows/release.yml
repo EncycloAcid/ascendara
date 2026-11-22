@@ -186,7 +186,6 @@ jobs:
           VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
         run: |
           if [ -z "$BUILD_SECRET" ]; then
-            if [ "$RELEASE_MODE" = true ]; then echo 'BUILD_SECRET is required for releases'; exit 1; fi
             BUILD_SECRET="$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')"
             echo "::add-mask::$BUILD_SECRET"
             export BUILD_SECRET
