@@ -807,9 +807,35 @@ const getGameDetails = async (gameName, config = {}) => {
   }
 
   // Get Steam data via proxy
-  const gameData = await getGameDetailsSteam(gameName, {
-    enabled: true,
-  });
+  let gameData = null;
+  let steamError = null;
+  try {
+    gameData = await getGameDetailsSteam(gameName, {
+      enabled: true,
+    });
+  } catch (err) {
+    steamError = err;
+  }
+
+  // If not found on Steam (or Steam proxy failed), fall back to GOG / Wikipedia
+  if (!gameData && typeof window !== "undefined" && window.electron?.getFallbackGameInfo) {
+    try {
+      const fallbackData = await window.electron.getFallbackGameInfo(gameName);
+      if (fallbackData) {
+        console.log(
+          `Using fallback (${fallbackData.source}) game data for: ${gameName}`
+        );
+        gameData = fallbackData;
+      }
+    } catch (fbErr) {
+      console.warn(`Fallback game data lookup failed for ${gameName}:`, fbErr);
+    }
+  }
+
+  // If Steam was unreachable AND fallback also found nothing, propagate the SteamLookupError
+  if (!gameData && steamError) {
+    throw steamError;
+  }
 
   // Cache the data if we found any
   if (gameData) {

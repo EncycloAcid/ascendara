@@ -609,6 +609,39 @@ contextBridge.exposeInMainWorld("electron", {
     preloadIpc.subscribe("nexus-mod-download-progress", callback, {
       selectArgs: args => [args[0]],
     }),
+  modManagerList: (gameName, isCustom) =>
+    ipcRenderer.invoke("mod-manager-list", { gameName, isCustom }),
+  modManagerInstallArchive: (gameName, isCustom, archivePath, meta) =>
+    ipcRenderer.invoke("mod-manager-install-archive", {
+      gameName,
+      isCustom,
+      archivePath,
+      meta,
+    }),
+  modManagerImportDialog: (gameName, isCustom) =>
+    ipcRenderer.invoke("mod-manager-import-dialog", { gameName, isCustom }),
+  modManagerToggle: (gameName, isCustom, modId, enabled) =>
+    ipcRenderer.invoke("mod-manager-toggle", { gameName, isCustom, modId, enabled }),
+  modManagerReorder: (gameName, isCustom, orderedIds) =>
+    ipcRenderer.invoke("mod-manager-reorder", { gameName, isCustom, orderedIds }),
+  modManagerSetSubpath: (gameName, isCustom, subpath) =>
+    ipcRenderer.invoke("mod-manager-set-subpath", { gameName, isCustom, subpath }),
+  modManagerUninstall: (gameName, isCustom, modId, deleteArchive) =>
+    ipcRenderer.invoke("mod-manager-uninstall", {
+      gameName,
+      isCustom,
+      modId,
+      deleteArchive,
+    }),
+  modManagerPurge: (gameName, isCustom) =>
+    ipcRenderer.invoke("mod-manager-purge", { gameName, isCustom }),
+  modManagerSaveProfile: (gameName, isCustom, name) =>
+    ipcRenderer.invoke("mod-manager-save-profile", { gameName, isCustom, name }),
+  modManagerSwitchProfile: (gameName, isCustom, profileId) =>
+    ipcRenderer.invoke("mod-manager-switch-profile", { gameName, isCustom, profileId }),
+  modManagerDeleteProfile: (gameName, isCustom, profileId) =>
+    ipcRenderer.invoke("mod-manager-delete-profile", { gameName, isCustom, profileId }),
+  getPlaySessions: options => ipcRenderer.invoke("get-play-sessions", options),
   isDownloaderRunning: () => ipcRenderer.invoke("is-downloader-running"),
   getRunningDownloads: () => ipcRenderer.invoke("get-running-downloads"),
   getDownloadHistory: () => ipcRenderer.invoke("get-download-history"),
@@ -647,6 +680,8 @@ contextBridge.exposeInMainWorld("electron", {
   openFolderPath: targetPath => ipcRenderer.invoke("open-folder-path", targetPath),
   // Resolves the absolute filesystem path for a File dragged into the app from the OS.
   getPathForFile: file => webUtils.getPathForFile(file),
+  resolveShortcutPath: filePath =>
+    ipcRenderer.invoke("resolve-shortcut-path", filePath),
   canCreateFiles: directory => ipcRenderer.invoke("can-create-files", directory),
   verifyDownloadDirectory: (directory, runId) =>
     ipcRenderer.invoke("verify-download-directory", directory, runId),
@@ -808,6 +843,8 @@ contextBridge.exposeInMainWorld("electron", {
   searchSteamGridGames: term => ipcRenderer.invoke("steamgrid-search-games", term),
   getSteamGridGameArtwork: gameId =>
     ipcRenderer.invoke("steamgrid-get-game-artwork", gameId),
+  getFallbackGameInfo: gameName =>
+    ipcRenderer.invoke("fallback-get-game-info", gameName),
   getHltbGameTimes: gameName => ipcRenderer.invoke("hltb-get-game-times", gameName),
 
   // Service status checks use the restricted request handler.

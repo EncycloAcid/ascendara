@@ -114,9 +114,25 @@ export function useNexusMods(nexusGameData, enabled = true, game = null) {
         isCustom: !!game?.isCustom,
       });
       if (result?.status === "completed") {
+        window.dispatchEvent(
+          new CustomEvent("ascendara-mod-downloaded", {
+            detail: {
+              gameName: game?.gameName,
+              path: result.path,
+              fileName: result.fileName,
+              mod: {
+                name: mod?.name || null,
+                version: mod?.version || null,
+                author: mod?.uploader?.name || null,
+                nexusModId: mod?.modId || null,
+                nexusDomain: domainName || null,
+              },
+            },
+          })
+        );
         toast.success(t("gameScreen.nexusDownload.saved", { file: result.fileName }), {
           id: toastId,
-          description: result.directory,
+          description: "Ready to install in Mod Manager",
           action: {
             label: t("gameScreen.nexusDownload.openFolder"),
             onClick: () => window.electron.openFolderPath(result.directory),

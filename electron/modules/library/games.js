@@ -26,6 +26,7 @@ const { setPlayingActivity, updateDiscordRPCToLibrary } = require("../app/discor
 const { hideWindow, showWindow } = require("../app/window");
 
 const { createGameExitMonitor } = require("./gameExitMonitor");
+const sessionHistory = require("./sessionHistory");
 const { ensureInstallSize } = require("./installSize");
 const dllGuard = require("./dllGuard");
 
@@ -1136,6 +1137,23 @@ function registerGameHandlers() {
             showWindow();
           }
           updateDiscordRPCToLibrary(`pc:${game}`);
+          const exitSummary = exitMonitor.result({
+            stopped: runGame.killed || runGame.stopRequested,
+            failed: launchFailed,
+          });
+          if (!launchFailed && runGame.playSession) {
+            const endedAt = Date.now();
+            const durationSeconds = Number.isFinite(exitSummary?.durationMs)
+              ? Math.round(exitSummary.durationMs / 1000)
+              : Math.round((endedAt - runGame.playSession.startedAt) / 1000);
+            sessionHistory.recordPlaySession({
+              id: runGame.playSession.sessionId,
+              game,
+              startedAt: runGame.playSession.startedAt,
+              endedAt,
+              durationSeconds,
+            });
+          }
           event.sender.send("game-closed", {
             game,
             isCustom,
@@ -1144,10 +1162,7 @@ function registerGameHandlers() {
               ...(!isCustom ? { _sourceDir: path.dirname(gameDirectory) } : {}),
               executable,
             },
-            ...exitMonitor.result({
-              stopped: runGame.killed || runGame.stopRequested,
-              failed: launchFailed,
-            }),
+            ...exitSummary,
           });
         });
 

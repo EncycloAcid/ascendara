@@ -491,6 +491,21 @@ const safeSetItem = (key, value) => {
   }
 };
 
+const clearCachedGame = (gameName, apiType = null) => {
+  if (!gameName) return;
+  try {
+    const normalized = normalizeGameName(gameName);
+    const prefixes = apiType
+      ? [getCachePrefix(apiType)]
+      : Object.values(CACHE_PREFIXES);
+    prefixes.forEach(prefix => {
+      localStorage.removeItem(`${prefix}${normalized}`);
+    });
+  } catch (error) {
+    console.error("Error clearing single game cache:", error);
+  }
+};
+
 // Export the service functions
 export { isQuotaExceededError, evictForSpace, safeSetItem };
 
@@ -498,6 +513,7 @@ export default {
   // New API
   getCachedGame,
   cacheGame,
+  clearCachedGame,
   clearExpiredCache,
   clearAllCache,
   getCacheStats,

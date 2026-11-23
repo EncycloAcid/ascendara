@@ -529,7 +529,7 @@ const Library = () => {
   }, []);
 
   const handleLibraryDrop = useCallback(
-    e => {
+    async e => {
       if (!e.dataTransfer?.types?.includes("Files")) return;
       e.preventDefault();
       dropZoneCounterRef.current = 0;
@@ -538,14 +538,27 @@ const Library = () => {
       const file = e.dataTransfer.files?.[0];
       if (!file) return;
 
-      if (!file.name?.toLowerCase().endsWith(".exe")) {
+      const lowerName = (file.name || "").toLowerCase();
+      const isExecutable =
+        lowerName.endsWith(".exe") ||
+        lowerName.endsWith(".lnk") ||
+        lowerName.endsWith(".bat") ||
+        lowerName.endsWith(".cmd") ||
+        lowerName.endsWith(".appimage") ||
+        lowerName.endsWith(".sh");
+
+      if (!isExecutable) {
         toast.error(t("library.addGame.dropInvalidFile"));
         return;
       }
 
       try {
-        const filePath = window.electron.getPathForFile(file);
+        let filePath = window.electron.getPathForFile(file);
         if (!filePath) return;
+        if (lowerName.endsWith(".lnk") && window.electron?.resolveShortcutPath) {
+          const resolved = await window.electron.resolveShortcutPath(filePath);
+          if (resolved) filePath = resolved;
+        }
         setDroppedExecutablePath(filePath);
         setIsAddGameOpen(true);
       } catch (error) {
@@ -5050,7 +5063,77 @@ const InstalledGameCard = memo(
     const [isUninstalling, setIsUninstalling] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
+    const [isCoverDragOver, setIsCoverDragOver] = useState(false);
+    const coverDragDepthRef = useRef(0);
     const isFavorite = favorites.includes(cardGameId);
+
+    const handleCardDragEnter = useCallback(e => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      const items = Array.from(e.dataTransfer.items || []);
+      const looksLikeImage = items.some(
+        item => item.kind === "file" && (!item.type || item.type.startsWith("image/"))
+      );
+      if (!looksLikeImage) return;
+      e.preventDefault();
+      e.stopPropagation();
+      coverDragDepthRef.current += 1;
+      setIsCoverDragOver(true);
+    }, []);
+
+    const handleCardDragOver = useCallback(e => {
+      if (!isCoverDragOver) return;
+      e.preventDefault();
+      e.stopPropagation();
+    }, [isCoverDragOver]);
+
+    const handleCardDragLeave = useCallback(e => {
+      if (!isCoverDragOver) return;
+      e.preventDefault();
+      e.stopPropagation();
+      coverDragDepthRef.current = Math.max(0, coverDragDepthRef.current - 1);
+      if (coverDragDepthRef.current === 0) setIsCoverDragOver(false);
+    }, [isCoverDragOver]);
+
+    const handleCardCoverDrop = useCallback(
+      e => {
+        const file = e.dataTransfer?.files?.[0];
+        const isImg =
+          file &&
+          (file.type?.startsWith("image/") ||
+            /\.(png|jpe?g|webp|gif)$/i.test(file.name || ""));
+        coverDragDepthRef.current = 0;
+        setIsCoverDragOver(false);
+        if (!isImg) return; // let .exe / .lnk bubble to Library dropzone
+
+        e.preventDefault();
+        e.stopPropagation();
+        if (!cardGameId) return;
+
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const dataUrl = typeof reader.result === "string" ? reader.result : null;
+          if (!dataUrl) return;
+          try {
+            if (window.electron?.updateGameCover) {
+              await window.electron.updateGameCover(cardGameId, null, dataUrl);
+            }
+            gameImageCache.set(cardGameId, dataUrl);
+            setImageData(dataUrl);
+            window.dispatchEvent(
+              new CustomEvent("game-cover-updated", {
+                detail: { gameName: cardGameId, dataUrl },
+              })
+            );
+            toast.success(`Updated cover for ${cardGameId}`);
+          } catch (err) {
+            console.error("[Library] Failed to set dropped cover:", err);
+            toast.error("Could not update game cover");
+          }
+        };
+        reader.readAsDataURL(file);
+      },
+      [cardGameId]
+    );
 
     useEffect(() => {
       const checkExecutable = async () => {
@@ -6135,7 +6218,19 @@ const InstalledGameCard = memo(
             onContextMenu={handleContextMenu}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onDragEnter={handleCardDragEnter}
+            onDragOver={handleCardDragOver}
+            onDragLeave={handleCardDragLeave}
+            onDrop={handleCardCoverDrop}
           >
+            {isCoverDragOver && (
+              <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed border-primary bg-background/85 px-3 text-center backdrop-blur-sm">
+                <ImageUp className="h-7 w-7 text-primary" />
+                <span className="text-xs font-semibold text-foreground">
+                  Drop to set cover
+                </span>
+              </div>
+            )}
             {bulkDeleteHelp}
             {selectionMode && game.isCustom && (
               <div className="absolute left-2 top-2 z-20 flex items-center justify-center rounded bg-white/80 p-0.5 shadow backdrop-blur-sm">

@@ -25,6 +25,9 @@ const { getSettingsManager } = require("../core/settings");
 const { sanitizeText, getExtensionFromMimeType } = require("../core/utils");
 const { initializeDiscordRPC, destroyDiscordRPC, setRPCState } = require("./discord-rpc");
 const steamgrid = require("../library/steamgrid");
+const fallbackMetadata = require("../library/fallbackMetadata");
+const modManager = require("../library/modManager");
+const sessionHistory = require("../library/sessionHistory");
 const soundPacks = require("./soundPacks");
 const { searchAchievementFolders } = require("../library/achievementFolderSearch");
 const { isSafeExternalUrl, isTrustedIpcSender } = require("../core/security");
@@ -807,6 +810,16 @@ function registerMiscHandlers() {
       return await steamgrid.getGameArtwork(gameId);
     } catch (error) {
       console.error("[SteamGrid] getGameArtwork IPC error:", error);
+      return null;
+    }
+  });
+
+  // Fallback game metadata (GOG / Wikipedia) when a game is not on Steam
+  ipcMain.handle("fallback-get-game-info", async (_, gameName) => {
+    try {
+      return await fallbackMetadata.getFallbackGameDetails(gameName);
+    } catch (error) {
+      console.error("[FallbackMetadata] getFallbackGameDetails IPC error:", error);
       return null;
     }
   });
@@ -2661,6 +2674,109 @@ function registerMiscHandlers() {
         console.error("Failed to load Nexus page:", error);
       });
     });
+  });
+
+  // Built-in Nexus Mod Manager IPC handlers
+  ipcMain.handle("mod-manager-list", async (_, { gameName, isCustom }) => {
+    const gameDir = findGameDirectory(gameName, isCustom);
+    return modManager.listGameMods(gameDir);
+  });
+
+  ipcMain.handle(
+    "mod-manager-install-archive",
+    async (_, { gameName, isCustom, archivePath, meta }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.installModFromArchive(gameDir, archivePath, meta || {});
+    }
+  );
+
+  ipcMain.handle(
+    "mod-manager-import-dialog",
+    async (ipcEvent, { gameName, isCustom }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      const win = BrowserWindow.fromWebContents(ipcEvent.sender);
+      return modManager.importModArchiveDialog(gameDir, win);
+    }
+  );
+
+  ipcMain.handle(
+    "mod-manager-toggle",
+    async (_, { gameName, isCustom, modId, enabled }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.toggleModEnabled(gameDir, modId, enabled);
+    }
+  );
+
+  ipcMain.handle(
+    "mod-manager-reorder",
+    async (_, { gameName, isCustom, orderedIds }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.reorderMods(gameDir, orderedIds);
+    }
+  );
+
+  ipcMain.handle(
+    "mod-manager-set-subpath",
+    async (_, { gameName, isCustom, subpath }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.setDeploySubpath(gameDir, subpath);
+    }
+  );
+
+  ipcMain.handle(
+    "mod-manager-uninstall",
+    async (_, { gameName, isCustom, modId, deleteArchive }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.uninstallMod(gameDir, modId, Boolean(deleteArchive));
+    }
+  );
+
+  ipcMain.handle("mod-manager-purge", async (_, { gameName, isCustom }) => {
+    const gameDir = findGameDirectory(gameName, isCustom);
+    return modManager.purgeAllMods(gameDir);
+  });
+
+  ipcMain.handle(
+    "mod-manager-save-profile",
+    async (_, { gameName, isCustom, name }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.saveProfile(gameDir, name);
+    }
+  );
+
+  ipcMain.handle(
+    "mod-manager-switch-profile",
+    async (_, { gameName, isCustom, profileId }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.switchProfile(gameDir, profileId);
+    }
+  );
+
+  ipcMain.handle(
+    "mod-manager-delete-profile",
+    async (_, { gameName, isCustom, profileId }) => {
+      const gameDir = findGameDirectory(gameName, isCustom);
+      return modManager.deleteProfile(gameDir, profileId);
+    }
+  );
+
+  // Resolve Windows .lnk shortcut target path for drag-and-drop custom game import
+  ipcMain.handle("resolve-shortcut-path", async (_, shortcutPath) => {
+    if (!shortcutPath || typeof shortcutPath !== "string") return null;
+    if (process.platform === "win32" && shortcutPath.toLowerCase().endsWith(".lnk")) {
+      try {
+        const parsed = shell.readShortcutLink(shortcutPath);
+        if (parsed?.target) return parsed.target;
+      } catch (err) {
+        console.warn("[Shortcut] Failed to resolve .lnk target:", err.message);
+      }
+    }
+    return shortcutPath;
+  });
+
+  // Playtime session history & 30-day heatmap
+  ipcMain.handle("get-play-sessions", async (_, options) => {
+    return sessionHistory.getPlaySessions(options || {});
   });
 
   // Download trainer to game directory

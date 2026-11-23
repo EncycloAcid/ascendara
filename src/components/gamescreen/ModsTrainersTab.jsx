@@ -19,6 +19,7 @@ import {
   Puzzle,
   Tag,
 } from "lucide-react";
+import ModManagerPanel from "./ModManagerPanel";
 
 /** Shown instead of a feature when the user has no Ascend access. */
 function AscendPromo({
@@ -324,8 +325,10 @@ export function ModsSection({
   );
 }
 
-/** Trainer and Nexus mods for the game; both need Ascend access. */
+/** Built-in Nexus Mod Manager, trainers, and Nexus Mods browser. */
 export default function ModsTrainersTab({
+  gameName,
+  isCustom = false,
   showTrainer,
   trainerProps,
   showMods,
@@ -333,6 +336,7 @@ export default function ModsTrainersTab({
 }) {
   return (
     <div className="space-y-4">
+      {gameName && <ModManagerPanel gameName={gameName} isCustom={isCustom} />}
       {showTrainer && <TrainerSection {...trainerProps} />}
       {showMods && <ModsSection {...modsProps} />}
     </div>

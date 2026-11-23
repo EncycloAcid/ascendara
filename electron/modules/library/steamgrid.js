@@ -3,6 +3,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const authHelper = require("../core/auth-helper");
 const { API_URL } = require("../core/config");
+const fallbackMetadata = require("./fallbackMetadata");
 
 const PROXY_BASE_URL = `${API_URL}/api/proxy/steamgrid`;
 
@@ -122,11 +123,45 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
   }
   const authHeaders = authHelper.generateAuthHeaders();
 
+  const downloadMissingFromFallback = async () => {
+    const needGrid = !findAsset(gameDir, "grid.ascendara");
+    const needHero = !findAsset(gameDir, "hero.ascendara");
+    if (!needGrid && !needHero) return;
+    try {
+      const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+      if (!fb || (!fb.grid && !fb.hero && !fb.header)) return;
+      const targets = [
+        { need: needGrid, url: fb.grid || fb.header, baseName: "grid.ascendara" },
+        { need: needHero, url: fb.hero || fb.header || fb.grid, baseName: "hero.ascendara" },
+      ];
+      for (const target of targets) {
+        if (!target.need || !target.url) continue;
+        let ext = path.extname(target.url.split("?")[0]).toLowerCase();
+        if (![".jpg", ".jpeg", ".png"].includes(ext)) ext = ".jpg";
+        try {
+          await downloadAsset(target.url, path.join(gameDir, target.baseName + ext));
+          console.log(
+            `[SteamGrid] Downloaded fallback ${target.baseName + ext} from ${fb.source}`
+          );
+        } catch (err) {
+          console.warn(
+            `[SteamGrid] Fallback download failed (${target.baseName}): ${err.message}`
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(`[SteamGrid] Fallback artwork lookup failed: ${err.message}`);
+    }
+  };
+
   try {
     // Shared, throttled search so a library full of imported games doesn't
     // burst the proxy into rate limiting
     const gameId = selectedGameId ?? (await resolveGameId(gameName, authHeaders, true));
-    if (!gameId) return false;
+    if (!gameId) {
+      await downloadMissingFromFallback();
+      return baseNames.some(baseName => findAsset(gameDir, baseName));
+    }
     console.log(`[SteamGrid] Found GameID ${gameId} for "${gameName}"`);
 
     // Definition of types (without extension in the filename for now)
@@ -194,10 +229,14 @@ async function fetchGameAssets(gameName, gameDir, selectedGameId, selectedLogoId
         if (e.response?.status === 429) break; // retried on the next visit
       }
     }
+    if (!findAsset(gameDir, "grid.ascendara") || !findAsset(gameDir, "hero.ascendara")) {
+      await downloadMissingFromFallback();
+    }
     return baseNames.some(baseName => findAsset(gameDir, baseName));
   } catch (error) {
     console.error(`[SteamGrid] Error:`, error.message);
-    return false;
+    await downloadMissingFromFallback();
+    return baseNames.some(baseName => findAsset(gameDir, baseName));
   }
 }
 
@@ -267,10 +306,18 @@ async function getHeaderUrl(gameName) {
   try {
     gameId = await resolveGameId(gameName, authHeaders, true);
   } catch {
+    // Try fallback artwork even if SteamGridDB proxy is unavailable/rate-limited
+    const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+    if (fb?.header || fb?.grid) {
+      return { gameId: null, url: fb.header || fb.grid, source: fb.source };
+    }
     // Flagged so the renderer doesn't cache a rate limit as "no artwork"
     return { gameId: null, url: null, failed: true };
   }
-  if (!gameId) return { gameId: null, url: null };
+  if (!gameId) {
+    const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+    return { gameId: null, url: fb?.header || fb?.grid || null, source: fb?.source || null };
+  }
 
   // 460x215 header-style grid matches Steam's header image aspect ratio.
   // Falls back to any portrait grid if the 460x215 variant isn't published.
@@ -290,7 +337,8 @@ async function getHeaderUrl(gameName) {
       if (e.response?.status === 429) return { gameId, url: null, failed: true };
     }
   }
-  return { gameId, url: null };
+  const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+  return { gameId, url: fb?.header || fb?.grid || null, source: fb?.source || null };
 }
 
 /**
@@ -301,7 +349,10 @@ async function getGridUrl(gameName) {
   if (!gameName || typeof gameName !== "string") return { gameId: null, url: null };
   const authHeaders = authHelper.generateAuthHeaders();
   const gameId = await resolveGameId(gameName, authHeaders);
-  if (!gameId) return { gameId: null, url: null };
+  if (!gameId) {
+    const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+    return { gameId: null, url: fb?.grid || fb?.header || null, source: fb?.source || null };
+  }
   try {
     const res = await throttledGet(
       `${PROXY_BASE_URL}/grids/game/${gameId}?styles=alternate&dimensions=600x900&mimes=image/jpeg,image/png&sort=score`,
@@ -313,7 +364,8 @@ async function getGridUrl(gameName) {
   } catch (e) {
     console.warn(`[SteamGrid] Cover fetch failed for "${gameName}":`, e.message);
   }
-  return { gameId, url: null };
+  const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+  return { gameId, url: fb?.grid || fb?.header || null, source: fb?.source || null };
 }
 
 /**
@@ -328,7 +380,15 @@ async function getImageUrls(gameName, { reportErrors = false } = {}) {
   const authHeaders = authHelper.generateAuthHeaders();
   const gameId = await resolveGameId(gameName, authHeaders, reportErrors);
   const result = { gameId, grid: null, hero: null, logo: null, header: null };
-  if (!gameId) return result;
+  if (!gameId) {
+    const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+    if (fb) {
+      result.grid = fb.grid || fb.header || null;
+      result.hero = fb.hero || fb.header || null;
+      result.header = fb.header || fb.grid || null;
+    }
+    return result;
+  }
 
   const queries = [
     {
@@ -367,6 +427,15 @@ async function getImageUrls(gameName, { reportErrors = false } = {}) {
       console.warn(`[SteamGrid] URL fetch failed (${key}) for "${gameName}":`, e.message);
       if (reportErrors) result.failed = true;
       if (e.response?.status === 429) break; // stop early when rate-limited
+    }
+  }
+
+  if (!result.grid || !result.hero || !result.header) {
+    const fb = await fallbackMetadata.getFallbackArtwork(gameName);
+    if (fb) {
+      if (!result.grid) result.grid = fb.grid || fb.header || null;
+      if (!result.hero) result.hero = fb.hero || fb.header || null;
+      if (!result.header) result.header = fb.header || fb.grid || null;
     }
   }
 

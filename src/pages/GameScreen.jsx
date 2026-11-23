@@ -1,5 +1,5 @@
 import { dialogTitleClassName } from "@/components/ui/dialog-styles";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -101,7 +101,9 @@ import SoundtrackTab from "@/components/gamescreen/SoundtrackTab";
 import ModsTrainersTab from "@/components/gamescreen/ModsTrainersTab";
 import ScreenshotsTab from "@/components/gamescreen/ScreenshotsTab";
 import NotesTab from "@/components/gamescreen/NotesTab";
-import { Camera, NotebookPen } from "lucide-react";
+import FixMetadataDialog, { getMetadataAlias } from "@/components/gamescreen/FixMetadataDialog";
+import PlaytimeTimelineCard from "@/components/PlaytimeTimelineCard";
+import { Camera, NotebookPen, RefreshCw } from "lucide-react";
 import { useGameSession, formatSessionTime } from "@/hooks/useGameSession";
 import { API_URL } from "@/config/api";
 
@@ -1705,6 +1707,47 @@ function InstalledGameScreen() {
 
   // Hero image state for header background
   const [heroImageData, setHeroImageData] = useState(null);
+  const [showFixMetadata, setShowFixMetadata] = useState(false);
+  const [isDraggingHero, setIsDraggingHero] = useState(false);
+  const heroDragDepthRef = useRef(0);
+
+  const handleHeroDrop = useCallback(
+    async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      heroDragDepthRef.current = 0;
+      setIsDraggingHero(false);
+
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (!file.type?.startsWith("image/") && !/\.(png|jpe?g|webp|gif)$/i.test(file.name || "")) {
+        toast.error("Drop a PNG, JPG, or WebP image to set the hero banner");
+        return;
+      }
+
+      const gameId = game?.game || game?.name;
+      if (!gameId) return;
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = typeof reader.result === "string" ? reader.result : null;
+        if (!dataUrl) return;
+        try {
+          if (window.electron?.saveGameAsset) {
+            await window.electron.saveGameAsset(gameId, "hero.ascendara.jpg", dataUrl);
+          }
+          heroImageCache.set(gameId, dataUrl);
+          setHeroImageData(dataUrl);
+          toast.success("Hero banner updated");
+        } catch (err) {
+          console.error("[GameScreen] Failed to set dropped hero image:", err);
+          toast.error("Could not update hero banner");
+        }
+      };
+      reader.readAsDataURL(file);
+    },
+    [game?.game, game?.name]
+  );
   const [hasGridImage, setHasGridImage] = useState(true);
   // Portrait grid used for the cover when the image on disk is a wide header
   const [tallCover, setTallCover] = useState(null);
@@ -2863,9 +2906,10 @@ function InstalledGameScreen() {
       setSteamLoading(true);
 
       // Steam API is always available (hardcoded)
-      console.log("Fetching game data from Steam API");
+      const lookupName = getMetadataAlias(gameName) || gameName;
+      console.log("Fetching game data from Steam API:", lookupName);
 
-      const data = await steamService.getGameDetails(gameName);
+      const data = await steamService.getGameDetails(lookupName);
 
       if (data) {
         if (data.screenshots && data.screenshots.length > 0) {
@@ -2940,16 +2984,16 @@ function InstalledGameScreen() {
       label: t("gameScreen.notes") || "Notes",
       icon: NotebookPen,
     },
-    // Mods and trainers share one section so the bar stays short
-    (supportsModManaging || supportsFlingTrainer) && {
+    // Built-in Nexus Mod Manager (+ Nexus browser & trainers when available)
+    {
       id: "extras",
       label: [
-        supportsModManaging && t("gameScreen.mods"),
+        t("gameScreen.mods") || "Mods",
         supportsFlingTrainer && t("gameScreen.trainers"),
       ]
         .filter(Boolean)
         .join(" & "),
-      icon: supportsModManaging ? Puzzle : Bolt,
+      icon: Puzzle,
     },
   ].filter(Boolean);
   const currentSection = sections.some(section => section.id === activeTab)
@@ -2959,7 +3003,7 @@ function InstalledGameScreen() {
   return (
     <div className="mx-auto w-full max-w-7xl pb-24 pt-4 fade-in">
       {/* Toolbar */}
-      <div className="mb-4 flex items-center">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <Button
           variant="ghost"
           size="sm"
@@ -2969,10 +3013,51 @@ function InstalledGameScreen() {
           <ChevronLeft className="h-4 w-4" />
           {t("common.back")}
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setShowFixMetadata(true)}
+          title="Clear cached metadata and search with a custom title"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Wrong Game Info?
+        </Button>
       </div>
 
       <div className="space-y-4">
-        <GameHero
+        <div
+          className="relative"
+          onDragEnter={e => {
+            if (!e.dataTransfer?.types?.includes("Files")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            heroDragDepthRef.current += 1;
+            setIsDraggingHero(true);
+          }}
+          onDragOver={e => {
+            if (!e.dataTransfer?.types?.includes("Files")) return;
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDragLeave={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            heroDragDepthRef.current = Math.max(0, heroDragDepthRef.current - 1);
+            if (heroDragDepthRef.current === 0) setIsDraggingHero(false);
+          }}
+          onDrop={handleHeroDrop}
+        >
+          {isDraggingHero && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary bg-background/80 backdrop-blur-sm">
+              <Camera className="h-8 w-8 text-primary" />
+              <p className="text-sm font-semibold text-foreground">
+                Drop image to set Hero Banner
+              </p>
+              <p className="text-xs text-muted-foreground">PNG, JPG, or WebP</p>
+            </div>
+          )}
+          <GameHero
           game={game}
           bannerImage={bannerImage}
           bannerIsCover={bannerImage === imageData}
@@ -3080,6 +3165,7 @@ function InstalledGameScreen() {
             }
           />
         </GameHero>
+        </div>
 
         {/* Notices */}
         {isOnLinux && !umuInstalled && (
@@ -3168,35 +3254,41 @@ function InstalledGameScreen() {
 
         <div key={currentSection} className="animate-section-in">
           {currentSection === "overview" && (
-            <GameOverviewTab
-              game={game}
-              steamData={steamData}
-              steamLoading={steamLoading}
-              screenshots={screenshots}
-              onEditGameInfo={() => setShowEditGameInfo(true)}
-              isAuthenticated={isAuthenticated}
-              onGetAscend={() => navigate("/ascend")}
-              isOnLinux={isOnLinux}
-              umuId={umuId}
-              umuIdInput={umuIdInput}
-              onUmuIdInputChange={setUmuIdInput}
-              umuIdSaving={umuIdSaving}
-              onSaveUmuId={async () => {
-                if (!game.executable) return;
-                setUmuIdSaving(true);
-                const result = await window.electron.umuSetGameId(
-                  game.game || game.name,
-                  umuIdInput
-                );
-                if (result.success) {
-                  setUmuId(umuIdInput);
-                  toast.success(t("gameScreen.umuIdSaved"));
-                } else {
-                  toast.error(t("gameScreen.umuIdSaveFailed"));
-                }
-                setUmuIdSaving(false);
-              }}
-            />
+            <div className="space-y-4">
+              <GameOverviewTab
+                game={game}
+                steamData={steamData}
+                steamLoading={steamLoading}
+                screenshots={screenshots}
+                onEditGameInfo={() => setShowEditGameInfo(true)}
+                isAuthenticated={isAuthenticated}
+                onGetAscend={() => navigate("/ascend")}
+                isOnLinux={isOnLinux}
+                umuId={umuId}
+                umuIdInput={umuIdInput}
+                onUmuIdInputChange={setUmuIdInput}
+                umuIdSaving={umuIdSaving}
+                onSaveUmuId={async () => {
+                  if (!game.executable) return;
+                  setUmuIdSaving(true);
+                  const result = await window.electron.umuSetGameId(
+                    game.game || game.name,
+                    umuIdInput
+                  );
+                  if (result.success) {
+                    setUmuId(umuIdInput);
+                    toast.success(t("gameScreen.umuIdSaved"));
+                  } else {
+                    toast.error(t("gameScreen.umuIdSaveFailed"));
+                  }
+                  setUmuIdSaving(false);
+                }}
+              />
+              <PlaytimeTimelineCard
+                gameName={game?.game || game?.name}
+                maxSessions={6}
+              />
+            </div>
           )}
 
           {currentSection === "achievements" && (
@@ -3247,6 +3339,8 @@ function InstalledGameScreen() {
 
           {currentSection === "extras" && (
             <ModsTrainersTab
+              gameName={game?.game || game?.name}
+              isCustom={Boolean(game?.isCustom)}
               hasAscendAccess={isAuthenticated && ascendAccess.hasAccess}
               isAuthenticated={isAuthenticated}
               onGetAscend={() => navigate("/ascend")}
@@ -3310,6 +3404,16 @@ function InstalledGameScreen() {
       </div>
 
       <ModDetailsDialog {...nexusMods.detailsProps} />
+      <FixMetadataDialog
+        open={showFixMetadata}
+        onOpenChange={setShowFixMetadata}
+        gameName={game?.game || game?.name}
+        onMetadataUpdated={data => setSteamData(data)}
+        onArtworkUpdated={({ coverUrl, heroUrl }) => {
+          if (coverUrl) setImageData(coverUrl);
+          if (heroUrl) setHeroImageData(heroUrl);
+        }}
+      />
 
       {/* Dialogs */}
       <VerifyingGameDialog

@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLanguage } from "@/context/LanguageContext";
+import PlaytimeTimelineCard from "./PlaytimeTimelineCard";
 
 const formatBytes = bytes => {
   if (!bytes || bytes <= 0) return "0 B";
@@ -400,6 +401,24 @@ export default function LibraryStatsDialog({
               )}
             </section>
           </div>
+
+          <PlaytimeTimelineCard
+            active={open}
+            maxSessions={8}
+            onSelectGame={
+              onSelectGame
+                ? name => {
+                    const match = [...games, ...folderGames, ...storeGames].find(
+                      g => (g.game || g.name) === name
+                    );
+                    if (match) {
+                      onOpenChange(false);
+                      onSelectGame(match);
+                    }
+                  }
+                : null
+            }
+          />
         </div>
       </DialogContent>
     </Dialog>
