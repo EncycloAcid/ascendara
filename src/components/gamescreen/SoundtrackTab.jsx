@@ -46,7 +46,7 @@ export default function SoundtrackTab({
 
   if (loading) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 shadow">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-[12px] border border-border/70 bg-card py-16">
         <Music2 className="h-8 w-8 animate-pulse text-primary/60" />
         <p className="animate-pulse text-sm font-medium text-primary/70">
           {t("gameScreen.loadingSoundtrack")}
@@ -57,7 +57,7 @@ export default function SoundtrackTab({
 
   if (error) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card px-6 py-16 text-center shadow">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-[12px] border border-border/70 bg-card px-6 py-16 text-center">
         <HeadphoneOff className="h-10 w-10 text-muted-foreground" />
         <p className="max-w-md text-sm text-muted-foreground">
           {t(`gameScreen.${error}`)}
@@ -71,7 +71,7 @@ export default function SoundtrackTab({
 
   if (soundtrack.length === 0) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 text-center shadow">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-[12px] border border-border/70 bg-card py-16 text-center">
         <div className="rounded-full bg-muted p-4">
           <HeadphoneOff className="h-10 w-10 text-muted-foreground" />
         </div>
@@ -86,10 +86,10 @@ export default function SoundtrackTab({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl bg-card shadow">
-      <div className="flex items-center justify-between gap-4 p-6">
+    <section className="overflow-hidden rounded-[12px] border border-border/70 bg-card">
+      <div className="flex items-center justify-between gap-4 p-5">
         <div className="min-w-0">
-          <h2 className="truncate text-xl font-semibold text-foreground">
+          <h2 className="truncate text-lg font-semibold tracking-tight text-foreground">
             {gameName} {t("gameScreen.soundtrack")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">

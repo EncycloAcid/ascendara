@@ -181,9 +181,9 @@ export default function GameHero({
 
   return (
     <TooltipProvider>
-      <section className="relative rounded-xl bg-card shadow">
+      <section className="relative rounded-[14px] border border-border/70 bg-card">
         {/* Banner */}
-        <div className="relative h-56 w-full overflow-hidden rounded-t-xl">
+        <div className="relative h-56 w-full overflow-hidden rounded-t-[13px]">
           {bannerImage && (
             <img
               src={bannerImage}
@@ -195,7 +195,7 @@ export default function GameHero({
               )}
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/55 to-black/15" />
         </div>
 
         {/* Identity */}
@@ -206,7 +206,7 @@ export default function GameHero({
           )}
         >
           {coverImage && (
-            <div className="relative h-48 w-32 shrink-0 overflow-hidden rounded-lg bg-muted/30 shadow-lg ring-1 ring-white/10">
+            <div className="relative h-48 w-32 shrink-0 overflow-hidden rounded-[10px] bg-muted/30 shadow-xl ring-1 ring-white/15">
               <img
                 src={coverImage}
                 alt={game.game}

@@ -34,7 +34,7 @@ export default function AchievementsTab({
 
   if (loading) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 shadow">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-[12px] border border-border/70 bg-card py-16">
         <Award className="h-8 w-8 animate-pulse text-primary/70" />
         <p className="animate-pulse text-sm font-medium text-primary/80">
           {t("gameScreen.loadingAchievements")}
@@ -45,7 +45,7 @@ export default function AchievementsTab({
 
   if (all.length === 0) {
     return (
-      <section className="flex flex-col items-center justify-center gap-4 rounded-xl bg-card py-16 text-center shadow">
+      <section className="flex flex-col items-center justify-center gap-4 rounded-[12px] border border-border/70 bg-card py-16 text-center">
         <div className="rounded-full bg-muted p-4">
           <Award className="h-10 w-10 text-muted-foreground" />
         </div>
@@ -63,14 +63,14 @@ export default function AchievementsTab({
   }
 
   return (
-    <section className="rounded-xl bg-card p-6 shadow">
+    <section className="rounded-[12px] border border-border/70 bg-card p-5">
       <div className="mb-5 space-y-3">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-foreground">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
             {t("gameScreen.achievements")}
           </h2>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm tabular-nums text-muted-foreground">
               <span className="text-base font-semibold text-primary">
                 {unlockedCount}
               </span>
@@ -92,10 +92,10 @@ export default function AchievementsTab({
             <div
               key={ach.achID || idx + page * perPage}
               className={cn(
-                "flex items-center gap-4 rounded-lg border p-3",
+                "flex items-center gap-4 rounded-[10px] border p-3 transition-colors",
                 unlocked
-                  ? "border-primary/30 bg-primary/5"
-                  : "border-border/40 bg-background/30"
+                  ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                  : "border-border/60 bg-background/40 hover:border-border"
               )}
               tabIndex={0}
               aria-label={ach.message}

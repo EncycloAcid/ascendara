@@ -3222,34 +3222,44 @@ function InstalledGameScreen() {
         <div
           role="tablist"
           data-tour="game-sections"
-          className="flex flex-wrap items-center gap-1 border-b border-border/40"
+          className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-[10px] border border-border/70 bg-card p-1"
         >
-          {sections.map(section => (
-            <button
-              key={section.id}
-              type="button"
-              role="tab"
-              aria-selected={currentSection === section.id}
-              onClick={() => {
-                setActiveTab(section.id);
-                if (section.id === "soundtrack") fetchSoundtrack();
-              }}
-              className={cn(
-                "-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                currentSection === section.id
-                  ? "rounded-t-md border-primary bg-primary/10 text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <section.icon className="h-4 w-4" />
-              {section.label}
-              {section.badge && (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
-                  {section.badge}
-                </span>
-              )}
-            </button>
-          ))}
+          {sections.map(section => {
+            const isActive = currentSection === section.id;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => {
+                  setActiveTab(section.id);
+                  if (section.id === "soundtrack") fetchSoundtrack();
+                }}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-2 rounded-[8px] px-3.5 py-2 text-sm font-medium transition-all",
+                  isActive
+                    ? "bg-primary text-secondary shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                )}
+              >
+                <section.icon className="h-4 w-4" />
+                {section.label}
+                {section.badge && (
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                      isActive
+                        ? "bg-secondary/20 text-secondary"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {section.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div key={currentSection} className="animate-section-in">

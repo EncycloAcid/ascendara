@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SafeHtml from "@/components/SafeHtml";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,8 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import HighballGameOptions from "@/components/gamescreen/HighballGameOptions";
 import {
-  CloudOff,
+  ChevronLeft,
+  ChevronRight,
   Edit3,
   ImageIcon,
   Info,
@@ -19,6 +20,7 @@ import {
   Plus,
   Search,
   Terminal,
+  X,
 } from "lucide-react";
 
 const PREVIEW_COUNT = 6;
@@ -43,8 +45,6 @@ export default function GameOverviewTab({
   steamLoading,
   screenshots,
   onEditGameInfo,
-  isAuthenticated,
-  onGetAscend,
   isOnLinux,
   umuId,
   umuIdInput,
@@ -54,18 +54,41 @@ export default function GameOverviewTab({
 }) {
   const { t } = useLanguage();
   const [showAllScreenshots, setShowAllScreenshots] = useState(false);
-  const hasMatch = steamData?.appid || game?.steamAppId;
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  const hasMatch = Boolean(steamData?.appid || steamData?.id || game?.steamAppId);
   const hasDescription = steamData?.about_the_game || steamData?.summary;
   const visibleScreenshots = showAllScreenshots
     ? screenshots
     : screenshots.slice(0, PREVIEW_COUNT);
 
+  const matchSubtitle = (() => {
+    if (!hasMatch) return t("gameScreen.noSteamMatchDescription");
+    if (steamData?.source === "gog") return "Matched via GOG Catalog";
+    if (steamData?.source === "wikipedia") return "Matched via Wikipedia & Wikidata";
+    return `Steam App ID: ${steamData?.appid || game?.steamAppId}`;
+  })();
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKeyDown = e => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      else if (e.key === "ArrowRight") {
+        setLightboxIndex(idx => (idx + 1) % screenshots.length);
+      } else if (e.key === "ArrowLeft") {
+        setLightboxIndex(idx => (idx - 1 + screenshots.length) % screenshots.length);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [lightboxIndex, screenshots.length]);
+
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-4">
         {hasDescription ? (
-          <section className="rounded-xl bg-card p-6 shadow">
-            <h2 className="mb-3 text-xl font-semibold text-foreground">
+          <section className="rounded-[12px] border border-border/70 bg-card p-6">
+            <h2 className="mb-3 text-lg font-semibold tracking-tight text-foreground">
               {t("gameScreen.aboutGame")}
             </h2>
             {steamData.about_the_game ? (
@@ -78,7 +101,7 @@ export default function GameOverviewTab({
             )}
           </section>
         ) : (
-          <section className="flex items-center justify-center rounded-xl bg-card px-6 py-12 text-center text-sm text-muted-foreground shadow">
+          <section className="flex items-center justify-center rounded-[12px] border border-border/70 bg-card px-6 py-12 text-center text-sm text-muted-foreground">
             {steamLoading ? (
               <Loader className="h-5 w-5 animate-spin text-primary" />
             ) : (
@@ -93,9 +116,9 @@ export default function GameOverviewTab({
         )}
 
         {screenshots.length > 0 && (
-          <section className="rounded-xl bg-card p-6 shadow">
+          <section className="rounded-[12px] border border-border/70 bg-card p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
                 {t("gameScreen.screenshots")}
               </h2>
               {!showAllScreenshots && screenshots.length > PREVIEW_COUNT && (
@@ -114,14 +137,14 @@ export default function GameOverviewTab({
                 <button
                   key={index}
                   type="button"
-                  className="group relative aspect-video overflow-hidden rounded-lg bg-muted transition-all hover:ring-2 hover:ring-primary"
-                  onClick={() => window.electron.openURL(screenshot.formatted_url)}
+                  className="group relative aspect-video overflow-hidden rounded-[10px] border border-border/60 bg-muted transition-all hover:border-primary/60"
+                  onClick={() => setLightboxIndex(index)}
                 >
                   <img
                     src={screenshot.formatted_url}
                     alt={t("gameScreen.screenshotAlt", { number: index + 1 })}
                     loading="lazy"
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 </button>
               ))}
@@ -131,18 +154,18 @@ export default function GameOverviewTab({
       </div>
 
       <aside className="space-y-4">
-        <section className="space-y-5 rounded-xl bg-card p-5 shadow">
-          {/* Matched store entry that the description, artwork and achievements come from */}
+        <section className="space-y-4 rounded-[12px] border border-border/70 bg-card p-5">
+          {/* Matched store/catalog entry */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               {steamData?.cover?.url ? (
                 <img
                   src={steamData.cover.url}
                   alt={steamData.name}
-                  className="h-12 w-20 shrink-0 rounded object-cover"
+                  className="h-12 w-20 shrink-0 rounded-[8px] border border-border/60 object-cover"
                 />
               ) : (
-                <div className="flex h-12 w-20 shrink-0 items-center justify-center rounded bg-muted">
+                <div className="flex h-12 w-20 shrink-0 items-center justify-center rounded-[8px] border border-border/60 bg-muted">
                   {hasMatch ? (
                     <ImageIcon className="h-5 w-5 text-muted-foreground" />
                   ) : (
@@ -151,16 +174,12 @@ export default function GameOverviewTab({
                 </div>
               )}
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">
+                <p className="truncate text-sm font-semibold text-foreground">
                   {hasMatch
                     ? steamData?.name || game?.game || game?.name
                     : t("gameScreen.noSteamMatch")}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {hasMatch
-                    ? `Steam App ID: ${steamData?.appid || game?.steamAppId}`
-                    : t("gameScreen.noSteamMatchDescription")}
-                </p>
+                <p className="text-xs text-muted-foreground">{matchSubtitle}</p>
               </div>
             </div>
             {onEditGameInfo && (
@@ -176,6 +195,11 @@ export default function GameOverviewTab({
             )}
           </div>
 
+          {steamData?.release_date && (
+            <DetailGroup title={t("download.releaseDate") || "Release Date"}>
+              {steamData.release_date}
+            </DetailGroup>
+          )}
           {steamData?.developers?.length > 0 && (
             <DetailGroup title={t("download.developers")}>
               {steamData.developers.join(", ")}
@@ -184,6 +208,34 @@ export default function GameOverviewTab({
           {steamData?.publishers?.length > 0 && (
             <DetailGroup title={t("download.publishers")}>
               {steamData.publishers.join(", ")}
+            </DetailGroup>
+          )}
+          {steamData?.genres?.length > 0 && (
+            <DetailGroup title={t("download.genres") || "Genres"}>
+              <div className="flex flex-wrap gap-1.5">
+                {steamData.genres.map(g => (
+                  <span
+                    key={g.id || g.name}
+                    className="rounded-md border border-border/60 bg-muted/50 px-2 py-0.5 text-xs text-foreground"
+                  >
+                    {g.name}
+                  </span>
+                ))}
+              </div>
+            </DetailGroup>
+          )}
+          {steamData?.platforms?.length > 0 && (
+            <DetailGroup title="Platforms">
+              <div className="flex flex-wrap gap-1.5">
+                {steamData.platforms.map(p => (
+                  <span
+                    key={p.id || p.name}
+                    className="rounded-md border border-border/60 bg-background/60 px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {p.name}
+                  </span>
+                ))}
+              </div>
             </DetailGroup>
           )}
         </section>
@@ -196,7 +248,7 @@ export default function GameOverviewTab({
         )}
 
         {isOnLinux && (
-          <section className="space-y-2 rounded-xl bg-card p-5 shadow">
+          <section className="space-y-2 rounded-[12px] border border-border/70 bg-card p-5">
             <div className="flex items-center gap-2">
               <Terminal className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">{t("gameScreen.umuId")}</span>
@@ -250,24 +302,61 @@ export default function GameOverviewTab({
             )}
           </section>
         )}
-
-        {!isAuthenticated && (
-          <section className="space-y-3 rounded-xl bg-card p-5 shadow">
-            <div className="flex items-start gap-3">
-              <CloudOff className="h-5 w-5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{t("gameScreen.cloudLibraryPromo")}</p>
-                <p className="text-xs text-muted-foreground">
-                  {t("gameScreen.cloudLibraryPromoDesc")}
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" className="w-full" onClick={onGetAscend}>
-              {t("gameScreen.getAscend")}
-            </Button>
-          </section>
-        )}
       </aside>
+
+      {/* In-app screenshot lightbox */}
+      {lightboxIndex !== null && screenshots[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 backdrop-blur-sm"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setLightboxIndex(null)}
+            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition-colors hover:bg-white/15"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {screenshots.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Previous screenshot"
+                onClick={e => {
+                  e.stopPropagation();
+                  setLightboxIndex(
+                    idx => (idx - 1 + screenshots.length) % screenshots.length
+                  );
+                }}
+                className="absolute left-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition-colors hover:bg-white/15"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next screenshot"
+                onClick={e => {
+                  e.stopPropagation();
+                  setLightboxIndex(idx => (idx + 1) % screenshots.length);
+                }}
+                className="absolute right-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition-colors hover:bg-white/15"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          <img
+            src={screenshots[lightboxIndex].formatted_url}
+            alt={t("gameScreen.screenshotAlt", { number: lightboxIndex + 1 })}
+            className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+          <span className="absolute bottom-5 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-xs font-medium tabular-nums text-white/80">
+            {lightboxIndex + 1} / {screenshots.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

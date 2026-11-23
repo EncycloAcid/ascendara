@@ -210,7 +210,7 @@ const DEPENDENCY_REGISTRY_PATHS = {
 // ============================================================================
 
 const appBranch = "live";
-const appVersion = "12.3.8";
+const appVersion = "12.3.9";
 const testingVersion = "";
 
 // Experimental and public-testing install the same "testing" build, so that

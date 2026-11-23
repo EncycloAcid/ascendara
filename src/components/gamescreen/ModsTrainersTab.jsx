@@ -54,7 +54,7 @@ function ModCard({ mod, showUploader, onSelect }) {
   return (
     <button
       type="button"
-      className="group overflow-hidden rounded-lg border border-border/40 bg-background/30 text-left transition-all hover:border-primary/50 hover:shadow-lg"
+      className="group overflow-hidden rounded-[10px] border border-border/70 bg-background/40 text-left transition-all hover:border-foreground/25 hover:bg-background/70"
       onClick={() => onSelect(mod)}
     >
       {mod.pictureUrl && (
@@ -63,11 +63,11 @@ function ModCard({ mod, showUploader, onSelect }) {
             src={mod.pictureUrl}
             alt={mod.name}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         </div>
       )}
-      <div className="p-4">
+      <div className="p-3.5">
         <h4 className="line-clamp-1 font-semibold text-foreground">{mod.name}</h4>
         {showUploader && mod.uploader?.name && (
           <p className="text-xs text-muted-foreground">
@@ -75,16 +75,16 @@ function ModCard({ mod, showUploader, onSelect }) {
           </p>
         )}
         {mod.summary && (
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{mod.summary}</p>
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{mod.summary}</p>
         )}
-        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
           {mod.version && (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 tabular-nums">
               <Tag className="h-3 w-3" />v{mod.version}
             </span>
           )}
           {mod.modCategory?.name && (
-            <span className="rounded bg-muted px-2 py-0.5">{mod.modCategory.name}</span>
+            <span className="rounded-md bg-muted px-2 py-0.5">{mod.modCategory.name}</span>
           )}
         </div>
       </div>
@@ -102,7 +102,7 @@ function TrainerSection({
 }) {
   const { t } = useLanguage();
   return (
-    <section className="flex flex-wrap items-center gap-5 rounded-xl bg-card p-6 shadow">
+    <section className="flex flex-wrap items-center gap-5 rounded-[12px] border border-border/70 bg-card p-5">
       {trainer?.imageUrl ? (
         <img
           src={trainer.imageUrl}
@@ -110,12 +110,12 @@ function TrainerSection({
           className="h-24 w-auto shrink-0 rounded-lg object-contain"
         />
       ) : (
-        <div className="rounded-full bg-primary/10 p-4">
+        <div className="rounded-[10px] bg-primary/10 p-4">
           <Bolt className="h-8 w-8 text-primary" />
         </div>
       )}
       <div className="min-w-0 flex-1 space-y-1">
-        <h2 className="text-lg font-semibold text-foreground">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
           {trainer?.title || t("gameScreen.trainersTitle")}
         </h2>
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -202,10 +202,10 @@ export function ModsSection({
 }) {
   const { t } = useLanguage();
   return (
-    <section className="rounded-xl bg-card p-6 shadow">
+    <section className="rounded-[12px] border border-border/70 bg-card p-5">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
             {t("gameScreen.modsTitle")}
           </h2>
           {nexusGameData && (

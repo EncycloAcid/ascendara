@@ -109,8 +109,8 @@ const RecentGameCard = ({ game, onPlay }) => {
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden transition-all duration-300",
-        "press cursor-pointer border-none hover:shadow-lg",
+        "group relative overflow-hidden rounded-[12px] border border-border/70 bg-card transition-all duration-200",
+        "press cursor-pointer hover:border-foreground/25",
         isRunning && "ring-2 ring-primary"
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -128,7 +128,7 @@ const RecentGameCard = ({ game, onPlay }) => {
                 alt={sanitizedGameName}
                 className={cn(
                   "h-full w-full object-cover transition-transform duration-300",
-                  isHovered && "scale-110"
+                  isHovered && "scale-105"
                 )}
               />
             )}
