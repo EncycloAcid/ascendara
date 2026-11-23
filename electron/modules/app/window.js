@@ -472,6 +472,7 @@ async function showErrorDialog(title, message) {
  */
 function registerWindowHandlers() {
   ipcMain.handle("shutdown-system", () => require("./system-power").shutdownSystem());
+  ipcMain.handle("sleep-system", () => require("./system-power").sleepSystem());
   // Other windows (store logins, the index relay) keep Electron's default
   // devTools setting, so close DevTools on any of them that opens it on Live.
   if (!devToolsAllowed) {

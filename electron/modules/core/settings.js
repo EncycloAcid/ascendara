@@ -90,6 +90,7 @@ class SettingsManager {
       bigPictureSounds: true,
       windowControlsStyle: "icons",
       menuBarSide: "left",
+      hideAscendNav: true,
       autoUpdate: true,
       endOnClose: false,
       language: "en",

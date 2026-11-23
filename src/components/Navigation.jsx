@@ -248,7 +248,12 @@ const Navigation = memo(() => {
         },
       ],
       footerItems: [
-        { path: "/ascend", label: t("common.ascend"), icon: AtSign },
+        {
+          path: "/ascend",
+          label: t("common.ascend"),
+          icon: AtSign,
+          hidden: settings.hideAscendNav !== false,
+        },
         {
           path: "/workshopdownloader",
           label: t("common.workshopDownloader"),
@@ -258,7 +263,7 @@ const Navigation = memo(() => {
         { path: "/settings", label: t("common.preferences"), icon: Settings2 },
       ],
     }),
-    [t, settings.viewWorkshopPage, debridNavVisible]
+    [t, settings.hideAscendNav, settings.viewWorkshopPage, debridNavVisible]
   );
 
   useEffect(() => {

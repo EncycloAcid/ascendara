@@ -949,7 +949,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
             : "pointer-events-none top-0 -translate-y-full opacity-0"
         }`}
       >
-        <div className="flex min-w-[280px] items-center gap-3 rounded-full border border-border/50 bg-background/80 px-6 py-2.5 shadow-lg backdrop-blur-md transition-colors hover:border-border hover:bg-background/90">
+        <div className="flex min-w-[280px] items-center gap-3 rounded-[12px] border border-border/70 bg-card/90 px-5 py-2.5 shadow-lg backdrop-blur-md transition-colors hover:border-foreground/25">
           <SearchIcon className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
             {searchQuery || t("search.placeholder")}
@@ -961,7 +961,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
           {apiMetadata && (
             <div className="mb-6 flex flex-col gap-3">
               {!apiMetadata.local && (
-                <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">
+                <div className="flex items-center gap-2 rounded-[10px] border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <span>{t("search.usinganApiWarning")}</span>
                   <a
@@ -999,7 +999,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
           <div className="space-y-6">
             <div className="flex items-center gap-4">
               <div data-tour="search-input" className="relative flex-1">
-                <SearchIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <SearchIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   ref={mainSearchRef}
                   placeholder={t("search.placeholder")}
@@ -1027,7 +1027,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                       mainSearchRef.current?.blur();
                     }
                   }}
-                  className="pl-10"
+                  className="h-10 rounded-[10px] border-border/70 bg-card pl-10"
                 />
                 {isIndexUpdating && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 transform text-yellow-500">
@@ -1037,7 +1037,7 @@ const Search = memo(({ scrollContainerRef, isVisible = true }) => {
                 {/* Quick Search & Recent Searches Dropdown */}
                 {showRecentSearches &&
                   (quickSearchResults.length > 0 || recentSearches.length > 0) && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[400px] overflow-y-auto rounded-lg border border-border bg-background shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[400px] overflow-y-auto rounded-[12px] border border-border/70 bg-card shadow-xl">
                       <div className="p-2">
                         {/* Quick Search Results */}
                         {quickSearchResults.length > 0 && (
@@ -1486,7 +1486,7 @@ const FeaturedGameCard = memo(({ game, onDownload, onContextMenu, trackViews }) 
   return (
     <div
       ref={viewRef}
-      className="group relative col-span-1 cursor-pointer overflow-hidden rounded-xl border-none bg-card transition-all duration-300 animate-in fade-in-50 hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/15 md:col-span-2"
+      className="group relative col-span-1 cursor-pointer overflow-hidden rounded-[12px] border border-border/70 bg-card transition-[border-color,transform,box-shadow] duration-300 animate-in fade-in-50 hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-xl md:col-span-2"
       style={{ minHeight: "320px" }}
       onClick={handleClick}
       onContextMenu={e => onContextMenu?.(e, game)}

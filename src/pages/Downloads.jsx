@@ -87,6 +87,7 @@ import { getReporterHeaders } from "@/services/firebase/firebaseService";
 import { freedByPause, isDownloadHalted } from "@/services/downloads/downloadState";
 import { useDownloadStall } from "@/hooks/useDownloadStall";
 import CloudTorrentList, { useCloudTorrents } from "@/components/debrid/CloudTorrentList";
+import DownloadSchedulerBar from "@/components/downloads/DownloadSchedulerBar";
 
 // Helper function to check if download speed is above 50 MB/s
 const isHighSpeed = speedString => {
@@ -1245,6 +1246,9 @@ const Downloads = () => {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="container mx-auto max-w-5xl px-4 pb-8">
+        <div className="mt-6">
+          <DownloadSchedulerBar hasActiveWork={!nothingLeft} />
+        </div>
         {view === "idle" && nothingLeft && cloud.items.length > 0 ? (
           <div className="mt-6">
             <CloudTorrentList cloud={cloud} />
@@ -1275,7 +1279,7 @@ const Downloads = () => {
             )}
           >
             {showFirstTimeAlert && (
-              <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+              <div className="flex items-start gap-3 rounded-[12px] border border-primary/25 bg-card px-4 py-3">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground">
@@ -1302,8 +1306,8 @@ const Downloads = () => {
             <section
               data-tour="downloads-speed"
               className={cn(
-                "relative overflow-hidden rounded-2xl bg-card shadow transition-colors duration-500",
-                highSpeed && "shadow-lg shadow-primary/10"
+                "relative overflow-hidden rounded-[16px] border border-border/70 bg-card transition-colors duration-500",
+                highSpeed && "border-primary/40 shadow-lg shadow-primary/10"
               )}
             >
               <div className="relative flex flex-wrap items-end justify-between gap-4 px-6 pt-5">
@@ -1446,7 +1450,7 @@ const Downloads = () => {
                   {t("downloads.queuedDownloads", "Queued Downloads")} ·{" "}
                   {queuedDownloads.length}
                 </h2>
-                <div className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card shadow">
+                <div className="divide-y divide-border/60 overflow-hidden rounded-[12px] border border-border/70 bg-card">
                   {queuedDownloads.map((item, index) => {
                     const blockReason = getQueueBlockReason(item, settings);
                     const torrentBlocked = blockReason === TORRENT_DISABLED_CODE;
@@ -2172,7 +2176,7 @@ const DownloadCard = ({
     <div
       data-tour="downloads-card"
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-500",
+        "group relative overflow-hidden rounded-[12px] border border-border/70 bg-card transition-[border-color,opacity,transform] duration-300 hover:border-foreground/25",
         needsAction && "border-amber-500/40",
         hasError && "border-red-500/40",
         isFading && "scale-95 opacity-0"
@@ -2196,7 +2200,7 @@ const DownloadCard = ({
       <div className="relative space-y-4 p-5">
         {/* Header: artwork, name, status and actions */}
         <div className="flex items-center gap-4">
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted/60 ring-1 ring-border/60">
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px] border border-border/70 bg-muted/60">
             {heroImage ? (
               <img src={heroImage} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -2204,7 +2208,7 @@ const DownloadCard = ({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-semibold text-foreground">
+            <h3 className="truncate text-base font-semibold tracking-tight text-foreground">
               {game.game}
             </h3>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -2243,7 +2247,7 @@ const DownloadCard = ({
           </div>
 
           {!isCompleted && (
-            <div className="flex shrink-0 items-center gap-0.5 rounded-xl bg-background/50 p-0.5 backdrop-blur-sm">
+            <div className="flex shrink-0 items-center gap-0.5 rounded-[10px] border border-border/60 bg-background/70 p-0.5 backdrop-blur-md">
               {canRetryExtraction(game) && !hasError && (
                 <IconAction
                   label={t("downloads.retryExtraction")}

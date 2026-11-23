@@ -2,6 +2,7 @@ import { useLibraryConflicts } from "@/hooks/useLibraryConflicts";
 import ProfileImage, { getInitial } from "@/components/ProfileImage";
 import { libraryInstallKey, reconcileFolderItems } from "@/lib/libraryConflicts";
 import LibraryConflictDialog from "@/components/LibraryConflictDialog";
+import LibraryStatsDialog from "@/components/LibraryStatsDialog";
 import {
   normalizeGameName,
   getGameDisplayName,
@@ -83,6 +84,8 @@ import {
   PanelLeft,
   Info,
   X,
+  BarChart3,
+  Hourglass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -104,7 +107,8 @@ import {
 } from "@/components/ui/tooltip";
 import gameService from "@/services/games/gameService";
 import imageCacheService from "@/services/images/imageCacheService";
-import { safeSetItem } from "@/services/games/gameInfoCacheService";
+import gameApiCache, { safeSetItem } from "@/services/games/gameInfoCacheService";
+import hltbService from "@/services/integrations/hltbService";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import steamService from "@/services/games/gameInfoService";
@@ -163,6 +167,7 @@ import { API_URL } from "@/config/api";
 import { MENU_BAR_HEIGHT_PX } from "@/lib/appChromeGeometry";
 import ContinuePlaying from "@/components/library/ContinuePlaying";
 import recentGamesService from "@/services/library/recentGamesService";
+import { buildLibrarySmartCollections } from "@/services/library/smartCollectionsService";
 
 const Retro = React.lazy(() => import("./Retro"));
 
@@ -423,6 +428,9 @@ const Library = () => {
   const [cloudLibraryLastSynced, setCloudLibraryLastSynced] = useState(null);
   const [gameUpdates, setGameUpdates] = useState({}); // {gameID: updateInfo}
   const [isLibraryValueOpen, setIsLibraryValueOpen] = useState(false);
+  const [isLibraryStatsOpen, setIsLibraryStatsOpen] = useState(false);
+  const [activeSmartCollectionId, setActiveSmartCollectionId] = useState(null);
+  const [smartCollectionsOpen, setSmartCollectionsOpen] = useState(true);
   const [libraryValueData, setLibraryValueData] = useState(() => {
     const cached = localStorage.getItem("library-value-cache-v2");
     return cached ? JSON.parse(cached) : null;
@@ -1687,10 +1695,25 @@ const Library = () => {
     );
   }
 
+  const smartCollections = buildLibrarySmartCollections(
+    [...games, ...getGamesInFolders(), ...ownedStoreGames],
+    recentGamesService.getRecentGames()
+  );
+  const activeSmartCollection =
+    activeTab === "smart"
+      ? smartCollections.find(c => c.id === activeSmartCollectionId) || null
+      : null;
+
   const tabGames =
-    activeTab === "favorites"
-      ? filteredGames.filter(g => !g.isFolder && favorites.includes(g.game || g.name))
-      : filteredGames;
+    activeTab === "smart" && activeSmartCollection
+      ? activeSmartCollection.games.filter(g =>
+          (g.game || g.name || "")
+            .toLowerCase()
+            .includes(searchQuery.trim().toLowerCase())
+        )
+      : activeTab === "favorites"
+        ? filteredGames.filter(g => !g.isFolder && favorites.includes(g.game || g.name))
+        : filteredGames;
 
   const updatesCount = Object.keys(gameUpdates).length;
 
@@ -1840,6 +1863,18 @@ const Library = () => {
           onClose={() => setGameToMove(null)}
         />
       )}
+      <LibraryStatsDialog
+        open={isLibraryStatsOpen}
+        onOpenChange={setIsLibraryStatsOpen}
+        games={games}
+        folderGames={getGamesInFolders()}
+        storeGames={ownedStoreGames}
+        deletedGames={deletedGames}
+        favorites={favorites}
+        storageInfo={storageInfo}
+        totalGamesSize={totalGamesSize}
+        onSelectGame={handlePlayGame}
+      />
       {/* ── Left Sidebar ─────────────────────────────────────────── */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border/60">
         {/* ── User profile strip ── */}
@@ -2190,6 +2225,81 @@ const Library = () => {
           })()}
         </nav>
 
+        {/* ── Smart Collections (auto-folders) ── */}
+        {smartCollections.length > 0 && (
+          <div className="mt-3 border-t border-border/50 px-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setSmartCollectionsOpen(prev => !prev)}
+              className="mb-1 flex w-full items-center justify-between px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+            >
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-primary" />
+                Smart Collections
+              </span>
+              <ChevronDown
+                className={cn(
+                  "h-3 w-3 transition-transform duration-200",
+                  !smartCollectionsOpen && "-rotate-90"
+                )}
+              />
+            </button>
+            {smartCollectionsOpen && (
+              <div className="space-y-0.5">
+                {smartCollections.map(collection => {
+                  const isActive =
+                    activeTab === "smart" && activeSmartCollectionId === collection.id;
+                  const iconMap = {
+                    recentlyInstalled: <Clock className="h-3.5 w-3.5" />,
+                    unplayedBacklog: <Bookmark className="h-3.5 w-3.5" />,
+                    coopOnline: <Gamepad2 className="h-3.5 w-3.5" />,
+                    under10gb: <HardDrive className="h-3.5 w-3.5" />,
+                    includesDlc: <Gift className="h-3.5 w-3.5" />,
+                  };
+                  return (
+                    <button
+                      key={collection.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveSmartCollectionId(collection.id);
+                        setActiveTab("smart");
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
+                        isActive
+                          ? "bg-primary font-semibold text-secondary shadow-sm"
+                          : "font-medium text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-5 w-5 shrink-0 items-center justify-center",
+                          isActive ? "text-secondary" : "text-muted-foreground"
+                        )}
+                      >
+                        {iconMap[collection.id] || <Sparkles className="h-3.5 w-3.5" />}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-left text-xs">
+                        {collection.label}
+                      </span>
+                      <span
+                        className={cn(
+                          "min-w-[1.25rem] rounded px-1 py-0.5 text-center text-[10px] font-bold tabular-nums",
+                          isActive
+                            ? "bg-secondary/15 text-secondary"
+                            : "bg-muted/80 text-muted-foreground"
+                        )}
+                      >
+                        {collection.games.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Spacer pushes storage to bottom ── */}
         <div className="flex-1" />
 
@@ -2484,7 +2594,8 @@ const Library = () => {
                   if (
                     e.target.value &&
                     activeTab !== "all" &&
-                    activeTab !== "hiddenFolders"
+                    activeTab !== "hiddenFolders" &&
+                    activeTab !== "smart"
                   ) {
                     setActiveTab("all");
                     const params = new URLSearchParams(location.search);
@@ -2505,7 +2616,8 @@ const Library = () => {
             <TooltipProvider>
               {(activeTab === "all" ||
                 activeTab === "favorites" ||
-                activeTab === "hiddenFolders") && (
+                activeTab === "hiddenFolders" ||
+                activeTab === "smart") && (
                 <>
                   <div
                     data-tour="library-view"
@@ -2861,6 +2973,22 @@ const Library = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+                    type="button"
+                    aria-label={t("library.stats.title") || "Library Stats"}
+                    onClick={() => setIsLibraryStatsOpen(true)}
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="text-secondary">
+                  {t("library.stats.title") || "Library Stats & Playtime"}
+                </TooltipContent>
+              </Tooltip>
+
               {activeTab === "all" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -3198,6 +3326,15 @@ const Library = () => {
                     t("library.history.subtitle") ||
                     "Games you've removed. Their playtime and stats are preserved here.",
                 },
+                ...(activeSmartCollection
+                  ? {
+                      smart: {
+                        icon: <Sparkles className="h-5 w-5 text-primary" />,
+                        title: activeSmartCollection.label,
+                        subtitle: activeSmartCollection.description,
+                      },
+                    }
+                  : {}),
               };
               const meta = tabMeta[activeTab];
               if (!meta) return null;
@@ -3273,10 +3410,11 @@ const Library = () => {
             </div>
           )}
 
-          {/* ── All Games / Favorites tab ── */}
+          {/* ── All Games / Favorites / Smart Collections tab ── */}
           {(activeTab === "all" ||
             activeTab === "favorites" ||
-            activeTab === "hiddenFolders") &&
+            activeTab === "hiddenFolders" ||
+            activeTab === "smart") &&
             (() => {
               const renderGameCard = game => (
                 <DeferredLibraryCard
@@ -4809,6 +4947,41 @@ const FavoritesGalleryCard = memo(
 
 FavoritesGalleryCard.displayName = "FavoritesGalleryCard";
 
+const getGameControllerMeta = gameName => {
+  if (!gameName) return { level: null, deckReady: false };
+  const steamInfo = gameApiCache.getCachedGame(gameName, "steam");
+  if (!steamInfo) return { level: null, deckReady: false };
+
+  let level = null;
+  const rawSupport = String(steamInfo.controller_support || "").toLowerCase();
+  if (rawSupport === "full") {
+    level = "full";
+  } else if (rawSupport === "partial") {
+    level = "partial";
+  } else if (Array.isArray(steamInfo.categories)) {
+    const hasFull = steamInfo.categories.some(
+      c => c?.id === 28 || /full controller/i.test(c?.description || "")
+    );
+    const hasPartial = steamInfo.categories.some(
+      c => c?.id === 18 || /partial controller/i.test(c?.description || "")
+    );
+    if (hasFull) level = "full";
+    else if (hasPartial) level = "partial";
+  }
+
+  const deckReady =
+    Boolean(
+      Array.isArray(steamInfo.platforms) &&
+        steamInfo.platforms.some(p => /linux/i.test(p?.name || ""))
+    ) ||
+    Boolean(
+      Array.isArray(steamInfo.categories) &&
+        steamInfo.categories.some(c => /steam deck/i.test(c?.description || ""))
+    );
+
+  return { level, deckReady };
+};
+
 const InstalledGameCard = memo(
   ({
     game,
@@ -4826,26 +4999,58 @@ const InstalledGameCard = memo(
     const { t } = useLanguage();
     const { settings } = useSettings();
     const navigate = useNavigate();
-    const isRunning = useGameRunning(game.game || game.name);
+    const cardGameId = game.game || game.name;
+    const isRunning = useGameRunning(cardGameId);
     const [isHovered, setIsHovered] = useState(false);
     const [imageData, setImageData] = useState(
-      () => gameImageCache.get(game.game || game.name) ?? null
+      () => gameImageCache.get(cardGameId) ?? null
     );
+    const [hltbMain, setHltbMain] = useState(() => {
+      const cached = gameApiCache.getCachedGame(cardGameId, "hltb");
+      return cached?.main ? hltbService.formatHours(cached.main) : null;
+    });
+    const hltbFetchedRef = useRef(Boolean(hltbMain));
+    const controllerMeta = useMemo(() => getGameControllerMeta(cardGameId), [cardGameId]);
+
+    useEffect(() => {
+      if (
+        !isHovered ||
+        hltbMain ||
+        hltbFetchedRef.current ||
+        game._isDownloading ||
+        game._isQueued ||
+        !cardGameId
+      ) {
+        return;
+      }
+      let cancelled = false;
+      const timer = setTimeout(async () => {
+        hltbFetchedRef.current = true;
+        try {
+          const times = await hltbService.getGameTimes(cardGameId);
+          if (!cancelled && times?.main) {
+            setHltbMain(hltbService.formatHours(times.main));
+          }
+        } catch {
+          // Silently ignore HLTB lookup errors on cards
+        }
+      }, 250);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }, [isHovered, hltbMain, cardGameId, game._isDownloading, game._isQueued]);
     const [executableExists, setExecutableExists] = useState(null);
     const [contextMenuOpen, setContextMenuOpen] = useState(false);
     const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-    const [logoData, setLogoData] = useState(
-      () => logoImageCache.get(game.game || game.name) ?? null
-    );
-    const [heroData, setHeroData] = useState(
-      () => heroImageCache.get(game.game || game.name) ?? null
-    );
+    const [logoData, setLogoData] = useState(() => logoImageCache.get(cardGameId) ?? null);
+    const [heroData, setHeroData] = useState(() => heroImageCache.get(cardGameId) ?? null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaveDataDialogOpen, setIsSaveDataDialogOpen] = useState(false);
     const [isUninstalling, setIsUninstalling] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
-    const isFavorite = favorites.includes(game.game || game.name);
+    const isFavorite = favorites.includes(cardGameId);
 
     useEffect(() => {
       const checkExecutable = async () => {
@@ -5777,6 +5982,38 @@ const InstalledGameCard = memo(
                     {t("library.view.version", { version: game.version })}
                   </span>
                 )}
+                {hltbMain && (
+                  <span
+                    className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
+                    title={`HowLongToBeat — Main Story: ~${hltbMain} hours`}
+                  >
+                    <Hourglass className="h-2.5 w-2.5" />
+                    {hltbMain}h
+                  </span>
+                )}
+                {controllerMeta.level && (
+                  <span
+                    className={cn(
+                      "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                      controllerMeta.level === "full"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "border-border/60 bg-muted/40 text-muted-foreground"
+                    )}
+                    title={
+                      controllerMeta.level === "full"
+                        ? controllerMeta.deckReady
+                          ? "Full Controller Support · Steam Deck / Linux Ready"
+                          : "Full Controller Support"
+                        : controllerMeta.deckReady
+                          ? "Partial Controller Support · Steam Deck / Linux Ready"
+                          : "Partial Controller Support"
+                    }
+                  >
+                    <Gamepad2 className="h-3 w-3" />
+                    {controllerMeta.level === "full" ? "Controller" : "Partial Pad"}
+                    {controllerMeta.deckReady ? " · Deck" : ""}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -6006,6 +6243,47 @@ const InstalledGameCard = memo(
                     </span>
                   )}
                 </div>
+                {/* Hover metadata badges (HLTB + Controller / Steam Deck) */}
+                {(hltbMain || controllerMeta.level) && !selectionMode && (
+                  <div
+                    className={cn(
+                      "pointer-events-none absolute right-2 top-2 z-20 flex flex-col items-end gap-1 transition-opacity duration-200",
+                      isHovered ? "opacity-100" : "opacity-0"
+                    )}
+                  >
+                    {hltbMain && (
+                      <span
+                        className="flex items-center gap-1 rounded-full border border-white/15 bg-black/65 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white shadow-sm backdrop-blur-md"
+                        title={`HowLongToBeat — Main Story: ~${hltbMain} hours`}
+                      >
+                        <Hourglass className="h-2.5 w-2.5 text-white/80" />
+                        {hltbMain}h
+                      </span>
+                    )}
+                    {controllerMeta.level && (
+                      <span
+                        className={cn(
+                          "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur-md",
+                          controllerMeta.level === "full"
+                            ? "border-emerald-400/35 bg-emerald-950/75 text-emerald-200"
+                            : "border-white/15 bg-black/65 text-white/85"
+                        )}
+                        title={
+                          controllerMeta.level === "full"
+                            ? controllerMeta.deckReady
+                              ? "Full Controller Support · Steam Deck / Linux Ready"
+                              : "Full Controller Support"
+                            : controllerMeta.deckReady
+                              ? "Partial Controller Support · Steam Deck / Linux Ready"
+                              : "Partial Controller Support"
+                        }
+                      >
+                        <Gamepad2 className="h-3 w-3" />
+                        {controllerMeta.deckReady ? "Deck" : null}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {/* Caption over the art: title and play time, with the
                     favorite button joining them on hover */}
                 <div

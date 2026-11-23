@@ -301,7 +301,7 @@ function ConsoleSetup({
                       entry.platforms.includes(platform.id) &&
                       (access.allowed || entry.id === draft.adapter)
                   )
-                  .map(entry => ({ value: entry.id, label: entry.name + " · Ascend" })),
+                  .map(entry => ({ value: entry.id, label: entry.name })),
               ]}
             />
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -1093,17 +1093,17 @@ export default function Retro() {
     <div className="space-y-6">
       <header className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-              <Gamepad2 className="h-6 w-6 text-primary" />
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-border/70 bg-card text-primary">
+              <Gamepad2 className="h-5 w-5" />
             </div>
-            <h2 className="text-2xl font-bold leading-none text-foreground">
+            <h2 className="m-0 text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground">
               {t("retro.title")}
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
-              className="gap-2 rounded-xl text-secondary"
+              className="gap-2 rounded-[10px] font-semibold text-secondary"
               disabled={!!state.job}
               onClick={() => setShowQuickAdd(true)}
             >
@@ -1112,10 +1112,10 @@ export default function Retro() {
             </Button>
             <Button
               variant="outline"
-              className="gap-2 rounded-xl border-primary/25 text-primary"
+              className="gap-2 rounded-[10px] border-border/70 bg-card text-foreground hover:border-foreground/25"
               onClick={() => setShowEmulators(true)}
             >
-              <Sparkles className="h-4 w-4" />
+              <Sparkles className="h-4 w-4 text-primary" />
               {t("retro.expanded.title")}
               <ArrowRight className="h-4 w-4" />
             </Button>
@@ -1138,12 +1138,6 @@ export default function Retro() {
             </strong>
             {t("retro.layout.systemsReady")}
           </span>
-          {access.allowed && (
-            <span className="inline-flex items-center gap-1.5 text-primary">
-              <Sparkles className="h-3.5 w-3.5" />
-              {t("retro.layout.ascendIncluded")}
-            </span>
-          )}
         </div>
       </header>
       {state.job && (
@@ -1178,26 +1172,6 @@ export default function Retro() {
           }}
         />
         <section className="min-w-0 space-y-5">
-          {!access.loading && !access.allowed && (
-            <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-primary/15 bg-gradient-to-r from-primary/5 to-transparent p-5">
-              <Sparkles className="h-6 w-6 shrink-0 text-primary/80" />
-              <div className="min-w-[180px] flex-1 space-y-1">
-                <h2 className="text-sm font-semibold">{t("retro.layout.promoTitle")}</h2>
-                <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  {t("retro.layout.promoDescription")}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2 text-primary"
-                onClick={() => navigate("/ascend")}
-              >
-                {t(access.signedIn ? "retro.expanded.explore" : "retro.expanded.signIn")}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
@@ -1339,7 +1313,7 @@ export default function Retro() {
                   {games.slice(0, limit).map(game => (
                     <article
                       key={game.id}
-                      className="group overflow-hidden rounded-xl bg-card shadow"
+                      className="group overflow-hidden rounded-[10px] border border-border/70 bg-card transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-foreground/25"
                     >
                       <button
                         className="block w-full text-left"
@@ -1425,7 +1399,7 @@ export default function Retro() {
                 {catalogueResults.map(game => (
                   <article
                     key={game.id}
-                    className="overflow-hidden rounded-xl bg-card shadow"
+                    className="overflow-hidden rounded-[10px] border border-border/70 bg-card transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-foreground/25"
                   >
                     <Cover game={game} />
                     <div className="space-y-1 p-3">

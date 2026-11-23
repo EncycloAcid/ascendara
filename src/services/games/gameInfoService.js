@@ -719,6 +719,15 @@ const formatSteamData = steamData => {
     // Structured system requirements
     system_requirements: systemRequirements,
 
+    // Controller support & Steam categories (for Library card badges)
+    controller_support: steamData.controller_support || null,
+    categories: Array.isArray(steamData.categories)
+      ? steamData.categories.map(c => ({
+          id: c.id,
+          description: c.description,
+        }))
+      : [],
+
     // Game features
     features: [],
 

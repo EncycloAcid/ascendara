@@ -48,10 +48,10 @@ export default function RetroConsoles({
       (!configuredOnly || profiles[platform.id]?.executable)
   );
   return (
-    <aside className="min-w-0 self-start rounded-2xl bg-card shadow lg:sticky lg:top-6">
+    <aside className="min-w-0 self-start rounded-[16px] border border-border/70 bg-card lg:sticky lg:top-6">
       <div className="space-y-3 p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{t("retro.consoles.label")}</h2>
+          <h2 className="text-sm font-semibold tracking-tight">{t("retro.consoles.label")}</h2>
           <span className="text-xs tabular-nums text-muted-foreground">
             {platforms.length}
           </span>
@@ -61,18 +61,18 @@ export default function RetroConsoles({
           <Input
             value={query}
             onChange={event => setQuery(event.target.value)}
-            className="h-9 bg-background pl-9 text-sm"
+            className="h-9 rounded-[10px] border-border/70 bg-background pl-9 text-sm"
             placeholder={t("retro.layout.findConsole")}
             aria-label={t("retro.layout.findConsole")}
           />
         </div>
-        <div className="flex rounded-lg bg-muted/50 p-1">
+        <div className="flex rounded-[10px] border border-border/70 bg-background p-1">
           {[false, true].map(value => (
             <button
               key={String(value)}
               onClick={() => setConfiguredOnly(value)}
               aria-pressed={configuredOnly === value}
-              className={`flex-1 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${configuredOnly === value ? "bg-background font-medium text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              className={`flex-1 rounded-[8px] px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${configuredOnly === value ? "bg-primary text-secondary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               {t(value ? "retro.layout.configured" : "retro.expanded.all")}
             </button>
@@ -81,7 +81,7 @@ export default function RetroConsoles({
         <button
           onClick={() => onSelect("all")}
           aria-pressed={selected === "all"}
-          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected === "all" ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted"}`}
+          className={`flex w-full items-center gap-2 rounded-[10px] px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected === "all" ? "bg-primary font-semibold text-secondary shadow-sm" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
         >
           <Library className="h-4 w-4" />
           {t("retro.filters.allConsoles")}
@@ -89,7 +89,7 @@ export default function RetroConsoles({
       </div>
       <nav
         aria-label={t("retro.consoles.label")}
-        className="max-h-64 space-y-4 overflow-y-auto border-t border-border p-3 lg:max-h-[calc(100vh-23rem)]"
+        className="max-h-64 space-y-4 overflow-y-auto border-t border-border/70 p-3 lg:max-h-[calc(100vh-23rem)]"
       >
         {families.map(([family, ids]) => {
           const entries = visible.filter(platform => ids.includes(platform.id));
@@ -107,9 +107,9 @@ export default function RetroConsoles({
                     onClick={() => (locked ? onExplore() : onSelect(platform.id))}
                     aria-pressed={selected === platform.id}
                     title={locked ? t("retro.layout.ascendOnly") : platform.name}
-                    className={`my-0.5 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected === platform.id ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+                    className={`my-0.5 flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected === platform.id ? "bg-primary font-semibold text-secondary shadow-sm" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"}`}
                   >
-                    <Gamepad2 className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                    <Gamepad2 className={`h-3.5 w-3.5 shrink-0 ${selected === platform.id ? "opacity-90" : "opacity-60"}`} />
                     <span className="min-w-0 flex-1">{platform.name}</span>
                     {locked ? (
                       <>

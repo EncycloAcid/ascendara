@@ -99,6 +99,9 @@ import GameOverviewTab from "@/components/gamescreen/GameOverviewTab";
 import AchievementsTab from "@/components/gamescreen/AchievementsTab";
 import SoundtrackTab from "@/components/gamescreen/SoundtrackTab";
 import ModsTrainersTab from "@/components/gamescreen/ModsTrainersTab";
+import ScreenshotsTab from "@/components/gamescreen/ScreenshotsTab";
+import NotesTab from "@/components/gamescreen/NotesTab";
+import { Camera, NotebookPen } from "lucide-react";
 import { useGameSession, formatSessionTime } from "@/hooks/useGameSession";
 import { API_URL } from "@/config/api";
 
@@ -2927,6 +2930,16 @@ function InstalledGameScreen() {
           : null,
     },
     { id: "soundtrack", label: t("gameScreen.soundtrack"), icon: Music2 },
+    {
+      id: "screenshots",
+      label: t("gameScreen.screenshots") || "Screenshots",
+      icon: Camera,
+    },
+    {
+      id: "notes",
+      label: t("gameScreen.notes") || "Notes",
+      icon: NotebookPen,
+    },
     // Mods and trainers share one section so the bar stays short
     (supportsModManaging || supportsFlingTrainer) && {
       id: "extras",
@@ -3219,6 +3232,17 @@ function InstalledGameScreen() {
                 play();
               }}
             />
+          )}
+
+          {currentSection === "screenshots" && (
+            <ScreenshotsTab
+              gameName={game?.game || game?.name}
+              onHeroUpdated={dataUrl => setHeroImageData(dataUrl)}
+            />
+          )}
+
+          {currentSection === "notes" && (
+            <NotesTab gameName={game?.game || game?.name} />
           )}
 
           {currentSection === "extras" && (

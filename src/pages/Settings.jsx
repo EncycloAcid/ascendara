@@ -1200,31 +1200,31 @@ function Settings() {
                           type="button"
                           onClick={() => setThemeGroup("classic")}
                           aria-pressed={themeGroup === "classic"}
-                          className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                          className={`flex items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-xs font-medium transition-colors ${
                             themeGroup === "classic"
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:text-foreground"
+                              ? "bg-primary font-semibold text-secondary shadow-sm"
+                              : "border border-border/70 bg-card text-muted-foreground hover:border-foreground/25 hover:text-foreground"
                           }`}
                         >
                           <History className="h-3.5 w-3.5" />
                           {t("settings.classicThemes")}
                         </button>
-                        <div className="flex rounded-lg bg-muted/50 p-0.5">
+                        <div className="flex rounded-[10px] border border-border/70 bg-card p-1">
                           {["light", "dark"].map(group => (
                             <button
                               key={group}
                               type="button"
                               onClick={() => setThemeGroup(group)}
-                              className={`relative rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                              className={`relative rounded-[8px] px-3 py-1 text-xs font-medium transition-colors ${
                                 themeGroup === group
-                                  ? "text-foreground"
+                                  ? "font-semibold text-secondary"
                                   : "text-muted-foreground hover:text-foreground"
                               }`}
                             >
                               {themeGroup === group && (
                                 <motion.span
                                   layoutId="settings-theme-group"
-                                  className="absolute inset-0 rounded-md bg-background shadow-sm"
+                                  className="absolute inset-0 rounded-[8px] bg-primary shadow-sm"
                                   transition={{
                                     type: "spring",
                                     stiffness: 400,
@@ -1356,6 +1356,27 @@ function Settings() {
                       value={settings.menuBarSide}
                       onChange={side => handleSettingChange("menuBarSide", side)}
                       t={t}
+                    />
+                  </div>
+
+                  <div
+                    id="hide-ascend-nav"
+                    className="flex items-center justify-between gap-4"
+                  >
+                    <div className="space-y-0.5">
+                      <Label>
+                        {t("settings.hideAscendNav") || "Hide Ascend navigation tab"}
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.hideAscendNavDescription") ||
+                          "Hide the Ascend membership tab from the left navigation rail."}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.hideAscendNav !== false}
+                      onCheckedChange={checked =>
+                        handleSettingChange("hideAscendNav", checked)
+                      }
                     />
                   </div>
                 </div>
@@ -3938,58 +3959,6 @@ function Settings() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Ascend Promo Dialog */}
-      <AlertDialog open={showAscendPromoDialog} onOpenChange={setShowAscendPromoDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              {t("settings.ascendPromoDialog.title")}
-            </AlertDialogTitle>
-            <div className="space-y-4 text-muted-foreground">
-              <p>
-                {t("settings.ascendPromoDialog.experimentalBranchExclusivePrefix")}{" "}
-                <strong className="text-red-400">
-                  {t("settings.ascendPromoDialog.experimentalBranch")}
-                </strong>{" "}
-                {t("settings.ascendPromoDialog.experimentalBranchExclusiveSuffix")}
-              </p>
-              <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
-                <h3 className="mb-2 font-semibold text-foreground">
-                  {t("settings.ascendPromoDialog.whySubscribe")}
-                </h3>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-start gap-2">
-                    <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <span>{t("settings.ascendPromoDialog.benefit1")}</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Heart className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <span>{t("settings.ascendPromoDialog.benefit2")}</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Gift className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                    <span>{t("settings.ascendPromoDialog.benefit3")}</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="text-primary">
-              {t("settings.ascendPromoDialog.maybeLater")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                window.electron?.openURL("https://ascendara.app/ascend?ref=app");
-                setShowAscendPromoDialog(false);
-              }}
-            >
-              {t("settings.ascendPromoDialog.learnMore")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Torrent Warning Dialog */}
       <AlertDialog open={showTorrentWarning} onOpenChange={setShowTorrentWarning}>
         <AlertDialogContent>
@@ -4291,7 +4260,7 @@ function Settings() {
 
 function SettingsNav({ categories, activeId, onSelect }) {
   return (
-    <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-l lg:border-border/60 lg:px-0 lg:pb-0">
+    <nav className="flex gap-1 overflow-x-auto rounded-[12px] border border-border/70 bg-card p-1.5 lg:flex-col lg:gap-0.5 lg:overflow-visible">
       {categories.map(category => {
         const isActive = activeId === category.id;
         return (
@@ -4300,21 +4269,21 @@ function SettingsNav({ categories, activeId, onSelect }) {
             type="button"
             onClick={() => onSelect(category.id)}
             aria-current={isActive ? "true" : undefined}
-            className={`relative flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary lg:-ml-px lg:rounded-none lg:rounded-r-md lg:pl-4 ${
+            className={`relative flex shrink-0 items-center gap-3 rounded-[8px] px-3 py-2 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
               isActive
-                ? "font-semibold text-foreground"
-                : "font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                ? "font-semibold text-secondary"
+                : "font-medium text-muted-foreground hover:bg-accent/60 hover:text-foreground"
             }`}
           >
             {isActive && (
               <motion.span
                 layoutId="settings-category-active"
-                className="absolute inset-0 rounded-md bg-primary/10 lg:inset-y-0 lg:left-0 lg:right-auto lg:w-0.5 lg:rounded-full lg:bg-primary"
+                className="absolute inset-0 rounded-[8px] bg-primary shadow-sm"
                 transition={{ type: "spring", stiffness: 400, damping: 34 }}
               />
             )}
             <category.icon
-              className={`relative h-4 w-4 shrink-0 ${isActive ? "text-primary" : ""}`}
+              className={`relative h-4 w-4 shrink-0 ${isActive ? "text-secondary" : ""}`}
             />
             <span className="relative whitespace-nowrap">{category.title}</span>
           </button>
@@ -4630,7 +4599,7 @@ function SettingsSection({ id, title, description, action, className = "", child
         >
           <div className="min-w-0 flex-1 space-y-1">
             {title && (
-              <h3 className="mb-0 text-lg font-semibold tracking-tight text-foreground">
+              <h3 className="mb-0 text-[1.375rem] font-semibold tracking-tight text-foreground">
                 {title}
               </h3>
             )}
